@@ -201,11 +201,6 @@ for column in categorical_columns:
         le = LabelEncoder()
         df[column] = le.fit_transform(df[column])
 
-
-# Features and target variable
-X = df.drop(columns=['Yield', 'Yield_log'])
-y = df['Yield_log']  # Using the log-transformed target variable
-
 reference_date = df[['CropTillageDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date']].min().min()
 
 # For CropTillageDate
@@ -221,6 +216,12 @@ df['Harv_date_days_since'] = (df['Harv_date'] - reference_date).dt.days
 df['Threshing_date_days_since'] = (df['Threshing_date'] - reference_date).dt.days
 
 df = df.drop(['CropTillageDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date'], axis=1)
+
+df['Harv_quarter'] = df['Harv_quarter'].astype(str).str[-1].astype(int)
+
+# Features and target variable
+X = df.drop(columns=['Yield', 'Yield_log'])
+y = df['Yield_log']  # Using the log-transformed target variable
 
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
