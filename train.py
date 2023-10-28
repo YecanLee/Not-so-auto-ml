@@ -206,6 +206,22 @@ for column in categorical_columns:
 X = df.drop(columns=['Yield', 'Yield_log'])
 y = df['Yield_log']  # Using the log-transformed target variable
 
+reference_date = df[['CropTillageDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date']].min().min()
+
+# For CropTillageDate
+df['CropTillageDate_days_since'] = (df['CropTillageDate'] - reference_date).dt.days
+
+# For SeedingSowingTransplanting
+df['SeedingSowingTransplanting_days_since'] = (df['SeedingSowingTransplanting'] - reference_date).dt.days
+
+# For Harv_date
+df['Harv_date_days_since'] = (df['Harv_date'] - reference_date).dt.days
+
+# For Threshing_date
+df['Threshing_date_days_since'] = (df['Threshing_date'] - reference_date).dt.days
+
+df = df.drop(['CropTillageDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date'], axis=1)
+
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
