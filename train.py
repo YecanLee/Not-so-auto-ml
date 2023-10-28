@@ -173,7 +173,7 @@ df['RcNursEstDate_day'].unique()
 
 # It seems that the year column is not useful, so we can drop it
 df = df.drop(['RcNursEstDate_year'], axis=1)
-df = df.drop('date_column', axis=1)
+df = df.drop('RcNursEstDate', axis=1)
 
 # Calculate basic statistical measures for numerical features (excluding the target variable 'Yield' and engineered features)
 numerical_columns = df.select_dtypes(include=[np.number]).columns.tolist()
