@@ -42,11 +42,13 @@ score = get_score(X_train, x_test, y_train, y_test)
 print("The MSE before feature generation is", score)
 
 # Generate features by using OpenFE
-features = ofe.fit(data = X_train, label = y_train, n_jobs=1, feature_boosting = True, metric='rmse')
+features = ofe.fit(data = X_train, label = y_train, n_jobs=12, feature_boosting = True, metric='rmse')
 print(ofe.new_features_list[:10])
 print('The top 10 generated features are', ofe.new_features_list[:10])
 
 # Test the newly generated features
-train_x, test_x = transform(X_train, x_test, ofe.new_features_list[:10], n_jobs=1)
+train_x, test_x = transform(X_train, x_test, ofe.new_features_list[:10], n_jobs=12)
+
+
 score = get_score(train_x, test_x, y_train, y_test)
 print("The MSE after feature generation is", score)
