@@ -251,7 +251,13 @@ import lightgbm as lgb
 lgb_model = lgb.LGBMRegressor()
 lgb_model.fit(X_train, y_train)
 
+from sklearn.metrics import mean_squared_error
 
+# For LightGBM
+y_pred_lgb = lgb_model.predict(X_test)
+rmse_lgb = np.sqrt(mean_squared_error(y_test, y_pred_lgb))
+
+print('RMSE for LightGBM: ', rmse_lgb)
 
 
 
