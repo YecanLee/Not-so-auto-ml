@@ -6,12 +6,22 @@ import pandas as pd
 from helper import get_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.impute import SimpleImputer
 
 ofe = OpenFE()
 
 # Load the dataset
 file_path = r'C:\Users\ra78lof\Not-so-auto-ml\Train.csv'
 df = pd.read_csv(file_path)
+
+# For RcNursEstDate, use backward filling based on the sorted order of CropTillageDate, this is the most reasonable way to fill the missing values
+df.sort_values(by='CropTillageDate', inplace=True)
+df['RcNursEstDate'].fillna(method='bfill', inplace=True)
+
+# For numerical features, use median imputation
+numerical_cols = ['SeedlingsPerPit', 'TransplantingIrrigationHours']
+imputer_num = SimpleImputer(strategy='median')
+df[numerical_cols] = imputer_num.fit_transform(df[numerical_cols])
 
 # Transfer the dtype Object columns 
 categorical_columns = df.select_dtypes(include=['object']).columns
@@ -48,7 +58,6 @@ print('The top 10 generated features are', ofe.new_features_list[:10])
 
 # Test the newly generated features
 train_x, test_x = transform(X_train, x_test, ofe.new_features_list[:10], n_jobs=12)
-
 
 score = get_score(train_x, test_x, y_train, y_test)
 print("The MSE after feature generation is", score)
