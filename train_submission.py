@@ -232,6 +232,36 @@ print(set(dataset.columns) == set(dataset_test.columns))
 print(dataset.shape, dataset_test.shape)
 print(dataset.columns)
 print(dataset.info())
+
+# Fill missing values in 1tdUrea and 2tdUrea with 0, as they will be summed
+dataset['1tdUrea'] = dataset['1tdUrea'].fillna(0)
+dataset['2tdUrea'] = dataset['2tdUrea'].fillna(0)
+dataset_test['1tdUrea'] = dataset_test['1tdUrea'].fillna(0)
+dataset_test['2tdUrea'] = dataset_test['2tdUrea'].fillna(0)
+
+# Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
+dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea']
+dataset_test['TotalUrea'] = dataset_test['1tdUrea'] + dataset_test['2tdUrea']
+
+# Do the same for 1appDaysUrea and 2appDaysUrea
+dataset['1appDaysUrea'] = dataset['1appDaysUrea'].fillna(0)
+dataset['2appDaysUrea'] = dataset['2appDaysUrea'].fillna(0)
+dataset_test['1appDaysUrea'] = dataset_test['1appDaysUrea'].fillna(0)
+dataset_test['2appDaysUrea'] = dataset_test['2appDaysUrea'].fillna(0)
+
+dataset['TotalAppDaysUrea'] = dataset['1appDaysUrea'] + dataset['2appDaysUrea']
+dataset_test['TotalAppDaysUrea'] = dataset_test['1appDaysUrea'] + dataset_test['2appDaysUrea']
+
+# Fill the Ganaura and CropOrgFYM with 0
+dataset['Ganaura'] = dataset['Ganaura'].fillna(0)
+dataset['CropOrgFYM'] = dataset['CropOrgFYM'].fillna(0)
+dataset_test['Ganaura'] = dataset_test['Ganaura'].fillna(0)
+dataset_test['CropOrgFYM'] = dataset_test['CropOrgFYM'].fillna(0)
+
+# Now drop the columns 2tdUrea and 2appDaysUrea as they are no longer needed
+dataset = dataset.drop(columns=['Ganaura', 'CropOrgFYM', '2tdUrea', '2appDaysUrea'])
+dataset_test = dataset_test.drop(columns=['Ganaura', 'CropOrgFYM', '2tdUrea', '2appDaysUrea'])
+
 sys.exit()
 
 
@@ -384,29 +414,6 @@ print(dataset.select_dtypes(include=['number']).shape[1], "Before handling numer
 bool_cols = dataset.select_dtypes(include=['bool']).columns
 dataset[bool_cols] = dataset[bool_cols].astype(int)
 dataset_test[bool_cols] = dataset_test[bool_cols].astype(int)
-
-# Fill missing values in 1tdUrea and 2tdUrea with 0, as they will be summed
-dataset['1tdUrea'] = dataset['1tdUrea'].fillna(0)
-dataset['2tdUrea'] = dataset['2tdUrea'].fillna(0)
-dataset_test['1tdUrea'] = dataset_test['1tdUrea'].fillna(0)
-dataset_test['2tdUrea'] = dataset_test['2tdUrea'].fillna(0)
-
-# Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
-dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea']
-dataset_test['TotalUrea'] = dataset_test['1tdUrea'] + dataset_test['2tdUrea']
-
-# Do the same for 1appDaysUrea and 2appDaysUrea
-dataset['1appDaysUrea'] = dataset['1appDaysUrea'].fillna(0)
-dataset['2appDaysUrea'] = dataset['2appDaysUrea'].fillna(0)
-dataset_test['1appDaysUrea'] = dataset_test['1appDaysUrea'].fillna(0)
-dataset_test['2appDaysUrea'] = dataset_test['2appDaysUrea'].fillna(0)
-
-dataset['TotalAppDaysUrea'] = dataset['1appDaysUrea'] + dataset['2appDaysUrea']
-dataset_test['TotalAppDaysUrea'] = dataset_test['1appDaysUrea'] + dataset_test['2appDaysUrea']
-
-# Now drop the columns 2tdUrea and 2appDaysUrea as they are no longer needed
-dataset = dataset.drop(columns=['Ganaura', 'CropOrgFYM', '2tdUrea', '2appDaysUrea'])
-dataset_test = dataset_test.drop(columns=['Ganaura', 'CropOrgFYM', '2tdUrea', '2appDaysUrea'])
 
 # Identify numerical and categorical columns
 numerical_cols = dataset.select_dtypes(include=['number']).columns
