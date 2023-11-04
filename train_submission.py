@@ -115,7 +115,6 @@ for feature in low_skewed_features:
     dataset.loc[outlier_indices, feature] = median_value
     dataset_test.loc[outlier_indices_test, feature] = median_value_test
 
-
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
@@ -151,6 +150,17 @@ dataset_test['NoFertilizerAppln_Binned'] = pd.cut(dataset_test['NoFertilizerAppl
 
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
+print(dataset['RcNursEstDate'].unique())
+# if RcNursEstDate is NaN, then fill NursDetFactor with None
+# if RcNursEstDate is not NaN, then fill NursDetFactor with mode
+dataset.loc[dataset['RcNursEstDate'].isnull(), 'NursDetFactor'] = 'None'
+dataset.loc[dataset['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset['NursDetFactor'].mode()[0]
+
+dataset_test.loc[dataset_test['RcNursEstDate'].isnull(), 'NursDetFactor'] = 'None'
+dataset_test.loc[dataset_test['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset_test['NursDetFactor'].mode()[0]
+
+print(dataset.info())
+sys.exit()
 
 # Datetime features generator
 date_features = ['CropTillageDate', 'RcNursEstDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date']
@@ -229,19 +239,17 @@ dataset_test = dataset_test.drop(columns=date_features)
 # debug
 print(set(dataset.columns) == set(dataset_test.columns))
 
-print(dataset.shape, dataset_test.shape)
-print(dataset.columns)
-print(dataset.info())
-
 # Fill missing values in 1tdUrea and 2tdUrea with 0, as they will be summed
+dataset['BasalUrea'] = dataset['BasalUrea'].fillna(0)
 dataset['1tdUrea'] = dataset['1tdUrea'].fillna(0)
 dataset['2tdUrea'] = dataset['2tdUrea'].fillna(0)
+dataset_test['BasalUrea'] = dataset_test['BasalUrea'].fillna(0)
 dataset_test['1tdUrea'] = dataset_test['1tdUrea'].fillna(0)
 dataset_test['2tdUrea'] = dataset_test['2tdUrea'].fillna(0)
 
 # Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
-dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea']
-dataset_test['TotalUrea'] = dataset_test['1tdUrea'] + dataset_test['2tdUrea']
+dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea'] + dataset['BasalUrea']
+dataset_test['TotalUrea'] = dataset_test['1tdUrea'] + dataset_test['2tdUrea'] + dataset_test['BasalUrea']
 
 # Do the same for 1appDaysUrea and 2appDaysUrea
 dataset['1appDaysUrea'] = dataset['1appDaysUrea'].fillna(0)
@@ -258,20 +266,41 @@ dataset['CropOrgFYM'] = dataset['CropOrgFYM'].fillna(0)
 dataset_test['Ganaura'] = dataset_test['Ganaura'].fillna(0)
 dataset_test['CropOrgFYM'] = dataset_test['CropOrgFYM'].fillna(0)
 
-# Now drop the columns 2tdUrea and 2appDaysUrea as they are no longer needed
-dataset = dataset.drop(columns=['Ganaura', 'CropOrgFYM', '2tdUrea', '2appDaysUrea'])
-dataset_test = dataset_test.drop(columns=['Ganaura', 'CropOrgFYM', '2tdUrea', '2appDaysUrea'])
+# Create cross features, cross between: CropEstMethod and [TransDetFactor,TransplantingIrrigationHours, 
+# TransplantingIrrigationSource, TransplantingIrrigationPowerSource, TransIrriCost, StandingWater, OrgFertilizers]
+dataset['CropEstMethod_TransDetFactor'] = dataset['CropEstMethod'].astype(str) + "_" + dataset['TransDetFactor'].astype(str)
+dataset_test['CropEstMethod_TransDetFactor'] = dataset_test['CropEstMethod'].astype(str) + "_" + dataset_test['TransDetFactor'].astype(str)
+
+# Check the unique values of the cross features
+print(dataset['CropEstMethod'].unique(), "Unique values of CropEstMethod")
+
+dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')   
+dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('None')
+
+dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('None')
+dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('None')
+
+dataset['BasalDAP'] = dataset['BasalDAP'].fillna(0)
+dataset_test['BasalDAP'] = dataset_test['BasalDAP'].fillna(0)    
+
+# If CropEstMethod is None, then fill the TransIrriCost with 0
+# if CropEstMethod is not none, then fill the StandingWater with median
+dataset['TransIrriCost'] = dataset['TransIrriCost'].fillna(0)   
+dataset_test['TransIrriCost'] = dataset_test['TransIrriCost'].fillna(0)
+
+dataset['TransplantingIrrigationPowerSource'] = dataset['TransplantingIrrigationPowerSource'].fillna('None')
+dataset_test['TransplantingIrrigationPowerSource'] = dataset_test['TransplantingIrrigationPowerSource'].fillna('None')
+
+dataset['SeedlingsPerPit'] = dataset['SeedlingsPerPit'].fillna(0)    
+dataset_test['SeedlingsPerPit'] = dataset_test['SeedlingsPerPit'].fillna(0)
+
+print(dataset['TransIrriCost'].unique())
+
+print(dataset.shape, dataset_test.shape)
+# print(dataset.columns)
+print(dataset.info())
 
 sys.exit()
-
-
-for feature in date_features:
-    dataset[feature] = pd.to_datetime(dataset[feature], errors='coerce')
-    dataset[f"{feature}_Month"] = dataset[feature].dt.month
-    #dataset[f"{feature}_Day"] = dataset[feature].dt.day
-    dataset_test[feature] = pd.to_datetime(dataset_test[feature], errors='coerce')
-    dataset_test[f"{feature}_Month"] = dataset_test[feature].dt.month
-    #dataset_test[f"{feature}_Day"] = dataset_test[feature].dt.day
 
 # debug
 print(set(dataset.columns) == set(dataset_test.columns))
