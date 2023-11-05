@@ -28,6 +28,36 @@ dataset = pd.read_csv(path)
 # print(dataset.shape) (3870, 44)
 # dataset.head()
 
+# Checking the unique values for categorical variables to identify sparse classes
+categorical_columns = dataset.select_dtypes(include=['object']).columns
+sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
+
+print(sparse_classes)
+
+# Define a threshold for grouping
+# Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
+threshold_percentage = 5
+threshold = len(dataset) * (threshold_percentage / 100)
+
+# Function to group sparse classes
+def group_sparse_classes(df, column, threshold):
+    # Find the categories that are below the threshold
+    value_counts = df[column].value_counts()
+    to_replace = value_counts[value_counts <= threshold].index.tolist()
+    
+    # Replace the sparse classes with 'other'
+    df[column] = df[column].replace(to_replace, 'other')
+    return df
+
+# Apply grouping for the identified categorical variables with many unique values
+for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']:
+    dataset = group_sparse_classes(dataset, col, threshold)
+
+# Check the new number of unique values for the grouped columns
+grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
+print(grouped_classes)
+
+
 # Prediction with the test dataset
 test_path = r'C:\Users\ra78lof\Not-so-auto-ml\Test.csv'
 dataset_test = pd.read_csv(test_path)
@@ -160,7 +190,6 @@ dataset_test.loc[dataset_test['RcNursEstDate'].isnull(), 'NursDetFactor'] = 'Non
 dataset_test.loc[dataset_test['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset_test['NursDetFactor'].mode()[0]
 
 print(dataset.info())
-sys.exit()
 
 # Datetime features generator
 date_features = ['CropTillageDate', 'RcNursEstDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date']
@@ -246,6 +275,29 @@ dataset['2tdUrea'] = dataset['2tdUrea'].fillna(0)
 dataset_test['BasalUrea'] = dataset_test['BasalUrea'].fillna(0)
 dataset_test['1tdUrea'] = dataset_test['1tdUrea'].fillna(0)
 dataset_test['2tdUrea'] = dataset_test['2tdUrea'].fillna(0)
+
+dataset['TotalOrganicFertilizer'] = dataset['Ganaura'] + dataset['CropOrgFYM']
+dataset['TotalChemicalFertilizer'] = dataset['BasalDAP'] + dataset['BasalUrea'] + dataset['1tdUrea'] + dataset['2tdUrea']
+
+# Create the ratio feature again
+dataset['Organic_Chemical_Fertilizer_Ratio'] = dataset['TotalOrganicFertilizer'] / dataset['TotalChemicalFertilizer']
+dataset['Organic_Chemical_Fertilizer_Ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace inf with NaN for division by zero cases
+
+# Create Polynomial Features: Squared terms for significant numerical features like CultLand and CropCultLand again
+dataset['CultLand_Squared'] = dataset['CultLand'] ** 2
+dataset['CropCultLand_Squared'] = dataset['CropCultLand'] ** 2
+
+# Calculate the total fertilizer used again
+dataset['TotalFertilizerUsed'] = dataset['TotalOrganicFertilizer'] + dataset['TotalChemicalFertilizer']
+
+# Calculate the Yield per kg of total fertilizer used again, replacing infinities with NaN
+dataset['Yield_per_kg_Fertilizer'] = dataset['Yield'] / dataset['TotalFertilizerUsed']
+dataset['Yield_per_kg_Fertilizer'].replace([np.inf, -np.inf], np.nan, inplace=True)
+
+# Showing the new features again
+new_features = dataset[['TotalOrganicFertilizer', 'TotalChemicalFertilizer', 'Organic_Chemical_Fertilizer_Ratio',
+                        'CultLand_Squared', 'CropCultLand_Squared', 'TotalFertilizerUsed', 'Yield_per_kg_Fertilizer']].head()
+new_features
 
 # Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
 dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea'] + dataset['BasalUrea']
