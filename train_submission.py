@@ -56,7 +56,7 @@ for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstT
 # Check the new number of unique values for the grouped columns
 grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
 print(grouped_classes)
-
+print(dataset.shape, dataset.columns)
 
 # Prediction with the test dataset
 test_path = r'C:\Users\ra78lof\Not-so-auto-ml\Test.csv'
@@ -79,6 +79,26 @@ dataset_test_original = dataset_test.copy()
 # print(set(dataset.columns) == set(dataset_test.columns))
 # print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
 # The columns are the same now
+
+# Adjust the function to use the categories from the training dataset
+def adjust_test_categories(train_df, test_df, column):
+    # Get the categories in the training data
+    train_categories = set(train_df[column].unique())
+    # Define a function to apply the adjustment
+    def adjust_category(cat):
+        return cat if cat in train_categories else 'other'
+    # Adjust the test data
+    test_df[column] = test_df[column].apply(adjust_category)
+    return test_df
+
+# Apply the category adjustment to the test dataset based on the training dataset categories
+for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']:
+    test_dataset = adjust_test_categories(train_dataset, test_dataset, col)
+
+# Check the new number of unique values for the grouped columns in the test dataset after the adjustment
+adjusted_unique_values_test = {col: test_dataset[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
+
+adjusted_unique_values_test
 
 ###-----------###
 """
