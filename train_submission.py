@@ -32,7 +32,7 @@ dataset = pd.read_csv(path)
 categorical_columns = dataset.select_dtypes(include=['object']).columns
 sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
 
-print(sparse_classes)
+# print(sparse_classes)
 
 # Define a threshold for grouping
 # Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
@@ -55,8 +55,12 @@ for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstT
 
 # Check the new number of unique values for the grouped columns
 grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
-print(grouped_classes)
-print(dataset.shape, dataset.columns)
+# Fill the missing values in the categorical columns with 'other', with the exception of 'LandPreparationMethod'
+dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
+dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
+dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
+# print(grouped_classes)
+# print(dataset.shape, dataset.columns)
 
 # Prediction with the test dataset
 test_path = r'C:\Users\ra78lof\Not-so-auto-ml\Test.csv'
@@ -93,41 +97,30 @@ def adjust_test_categories(train_df, test_df, column):
 
 # Apply the category adjustment to the test dataset based on the training dataset categories
 for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']:
-    test_dataset = adjust_test_categories(train_dataset, test_dataset, col)
+    test_dataset = adjust_test_categories(dataset, dataset_test, col)
 
 # Check the new number of unique values for the grouped columns in the test dataset after the adjustment
-adjusted_unique_values_test = {col: test_dataset[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
+adjusted_unique_values_test = {col: dataset_test[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
 
-adjusted_unique_values_test
+# print(adjusted_unique_values_test)
 
+# Fill the missing value like in the training dataset
+dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('other')
+dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna('other')
+dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna('other')
+
+# print(dataset.columns == dataset_test.columns)
 ###-----------###
-"""
-# Outlier detection based on skewed features.
-skewed_features = ['SeedlingsPerPit', 'TransplantingIrrigationHours', 'TransIrriCost', 
-                   'StandingWater', 'Ganaura', 'CropOrgFYM', 'NoFertilizerAppln',
-                   'BasalDAP', 'BasalUrea', 'Harv_hand_rent', 'Residue_length',
-                   'Residue_perc', 'Acre']
 
-# Calculate Z-scores for these features
-z_scores = dataset[skewed_features].apply(zscore, nan_policy='omit')
-
-# Create a DataFrame to store features and the count of outliers based on Z-score > 3
-outliers_count = {}
-for feature in skewed_features:
-    outliers_count[feature] = len(z_scores.loc[abs(z_scores[feature]) > 3])
-
-outliers_count_df = pd.DataFrame(list(outliers_count.items()), columns=['Feature', 'Outliers_Count'])
-
-print(outliers_count_df.sort_values(by='Outliers_Count', ascending=False))
-
-###-----------###
-"""
-
-high_skewed_features = ['Residual Perc', 'Standing water']
+high_skewed_features = ['Residue_perc', 'StandingWater']
 low_skewed_features = ['Residue_length', 'CropOrgFYM', 'Harv_hand_rent', 'SeedlingsPerPit']
 moderate_skewed_features = ['BasalDAP', 'Acre', 
                             'TransIrriCost', 'Ganaura',
                             'BasalUrea', 'TransplantingIrrigationHours']
+
+# Fill the high_skewed_features with 0
+dataset[high_skewed_features] = dataset[high_skewed_features].fillna(0)
+dataset_test[high_skewed_features] = dataset_test[high_skewed_features].fillna(0)
 
 # Outlier remove preprocessing
 # Cap at 99th percentile
@@ -139,19 +132,6 @@ for feature in moderate_skewed_features:
 
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
-
-"""
-# Remove outliers
-for feature in low_skewed_features:
-    z_scores = zscore(dataset[feature].dropna())
-    z_scores_test = zscore(dataset_test[feature].dropna())
-    abs_z_scores = abs(z_scores)
-    abs_z_scores_test = abs(z_scores_test)
-    filtered_entries = (abs_z_scores <= 3)
-    filtered_entries_test = (abs_z_scores_test <= 3)
-    dataset = dataset.loc[dataset[feature].index.isin(dataset[feature].dropna().index[filtered_entries])]
-    # dataset_test = dataset_test.loc[dataset_test[feature].index.isin(dataset_test[feature].dropna().index[filtered_entries_test])]
-"""
 
 for feature in low_skewed_features:
     median_value = dataset[feature].median()
@@ -182,6 +162,8 @@ for feature in low_skewed_features:
 # Find the best binning strategy for SeedlingsPerPit
 # dataset['SeedlingsPerPit'].value_counts().sort_index()
 # Binning the SeedlingsPerPit
+dataset['SeedlingsPerPit'] = dataset['SeedlingsPerPit'].fillna(0)
+dataset_test['SeedlingsPerPit'] = dataset_test['SeedlingsPerPit'].fillna(0)
 bins_SeedlingsPerPit = [0, 2, 4, np.inf]
 labels_SeedlingsPerPit = ['Low', 'Medium', 'High']
 dataset['SeedlingsPerPit_Binned'] = pd.cut(dataset['SeedlingsPerPit'], bins=bins_SeedlingsPerPit, labels=labels_SeedlingsPerPit)
@@ -200,7 +182,7 @@ dataset_test['NoFertilizerAppln_Binned'] = pd.cut(dataset_test['NoFertilizerAppl
 
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
-print(dataset['RcNursEstDate'].unique())
+# print(dataset['RcNursEstDate'].unique())
 # if RcNursEstDate is NaN, then fill NursDetFactor with None
 # if RcNursEstDate is not NaN, then fill NursDetFactor with mode
 dataset.loc[dataset['RcNursEstDate'].isnull(), 'NursDetFactor'] = 'None'
@@ -209,7 +191,7 @@ dataset.loc[dataset['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset['Nurs
 dataset_test.loc[dataset_test['RcNursEstDate'].isnull(), 'NursDetFactor'] = 'None'
 dataset_test.loc[dataset_test['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset_test['NursDetFactor'].mode()[0]
 
-print(dataset.info())
+# print(dataset.info())
 
 # Datetime features generator
 date_features = ['CropTillageDate', 'RcNursEstDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date']
@@ -221,6 +203,19 @@ date_features = ['CropTillageDate', 'RcNursEstDate', 'SeedingSowingTransplanting
 # We start to generate those features
 
 # Harvest_date - SeedingSowingTransplanting
+# 'Harv_date', 'SeedingSowingTransplanting', 'Harv_date_SeedingSowingTransplanting' and 'RcNursEstDate' are all datetime features
+# Fill the 'Harv_date', 'SeedingSowingTransplanting', 'Harv_date_SeedingSowingTransplanting' and 'RcNursEstDate' with median
+dataset['Harv_date'] = dataset['Harv_date'].fillna(dataset['Harv_date'].median())
+dataset['SeedingSowingTransplanting'] = dataset['SeedingSowingTransplanting'].fillna(dataset['SeedingSowingTransplanting'].median())
+dataset['RcNursEstDate'] = dataset['RcNursEstDate'].fillna(dataset['RcNursEstDate'].median())
+dataset['Threshing_date'] = dataset['Threshing_date'].fillna(dataset['Threshing_date'].median())
+dataset['CropTillageDate'] = dataset['CropTillageDate'].fillna(dataset['CropTillageDate'].median())
+dataset_test['Harv_date'] = dataset_test['Harv_date'].fillna(dataset_test['Harv_date'].median())
+dataset_test['SeedingSowingTransplanting'] = dataset_test['SeedingSowingTransplanting'].fillna(dataset_test['SeedingSowingTransplanting'].median())
+dataset_test['RcNursEstDate'] = dataset_test['RcNursEstDate'].fillna(dataset_test['RcNursEstDate'].median())
+dataset_test['Threshing_date'] = dataset_test['Threshing_date'].fillna(dataset_test['Threshing_date'].median())
+dataset_test['CropTillageDate'] = dataset_test['CropTillageDate'].fillna(dataset_test['CropTillageDate'].median())
+
 dataset['Harv_date'] = pd.to_datetime(dataset['Harv_date'], errors='coerce')
 dataset['SeedingSowingTransplanting'] = pd.to_datetime(dataset['SeedingSowingTransplanting'], errors='coerce')
 dataset['Harv_date_SeedingSowingTransplanting'] = (dataset['Harv_date'] - dataset['SeedingSowingTransplanting']).dt.days
@@ -231,9 +226,13 @@ dataset_test['Harv_date_SeedingSowingTransplanting'] = (dataset_test['Harv_date'
 # Harvest_date - RcNursEstDate
 dataset['RcNursEstDate'] = pd.to_datetime(dataset['RcNursEstDate'], errors='coerce')
 dataset_test['RcNursEstDate'] = pd.to_datetime(dataset_test['RcNursEstDate'], errors='coerce')
+print(dataset['RcNursEstDate'].unique())
 # print(dataset['RcNursEstDate'].dtype)
+# If the Harv_date_RcNursEstDate is smaller than 0, add 365 to it
 dataset['Harv_date_RcNursEstDate'] = (dataset['Harv_date'] - dataset['RcNursEstDate']).dt.days
 dataset_test['Harv_date_RcNursEstDate'] = (dataset_test['Harv_date'] - dataset_test['RcNursEstDate']).dt.days
+dataset.loc[dataset['Harv_date_RcNursEstDate'] < 0, 'Harv_date_RcNursEstDate'] = dataset.loc[dataset['Harv_date_RcNursEstDate'] < 0, 'Harv_date_RcNursEstDate'] + 365
+dataset_test.loc[dataset_test['Harv_date_RcNursEstDate'] < 0, 'Harv_date_RcNursEstDate'] = dataset_test.loc[dataset_test['Harv_date_RcNursEstDate'] < 0, 'Harv_date_RcNursEstDate'] + 365
 
 # Harvest_date - CropTillageDate
 dataset['CropTillageDate'] = pd.to_datetime(dataset['CropTillageDate'], errors='coerce')
@@ -252,8 +251,8 @@ dataset['Harv_date_Month'] = dataset['Harv_date'].dt.month
 dataset_test['Harv_date_Month'] = dataset_test['Harv_date'].dt.month
 
 # Check the unique values of the categorical features
-print(dataset['Harv_date_Month'].unique())
-print(dataset_test['Harv_date_Month'].unique())
+# print(dataset['Harv_date_Month'].unique())
+# print(dataset_test['Harv_date_Month'].unique())
 
 # Transfer the Month values into seasonn feature
 # 1, 2, 3 -> 1
@@ -292,36 +291,50 @@ print(set(dataset.columns) == set(dataset_test.columns))
 dataset['BasalUrea'] = dataset['BasalUrea'].fillna(0)
 dataset['1tdUrea'] = dataset['1tdUrea'].fillna(0)
 dataset['2tdUrea'] = dataset['2tdUrea'].fillna(0)
+dataset['BasalDAP'] = dataset['BasalDAP'].fillna(0)
 dataset_test['BasalUrea'] = dataset_test['BasalUrea'].fillna(0)
 dataset_test['1tdUrea'] = dataset_test['1tdUrea'].fillna(0)
 dataset_test['2tdUrea'] = dataset_test['2tdUrea'].fillna(0)
 
+dataset_test['BasalDAP'] = dataset_test['BasalDAP'].fillna(0)
+
+# Fill the Ganaura and CropOrgFYM with 0
+dataset['Ganaura'] = dataset['Ganaura'].fillna(0)
+dataset['CropOrgFYM'] = dataset['CropOrgFYM'].fillna(0)
+dataset_test['Ganaura'] = dataset_test['Ganaura'].fillna(0)
+dataset_test['CropOrgFYM'] = dataset_test['CropOrgFYM'].fillna(0)
+
 dataset['TotalOrganicFertilizer'] = dataset['Ganaura'] + dataset['CropOrgFYM']
 dataset['TotalChemicalFertilizer'] = dataset['BasalDAP'] + dataset['BasalUrea'] + dataset['1tdUrea'] + dataset['2tdUrea']
+dataset['TotalFertilizerUsed'] = dataset['TotalOrganicFertilizer'] + dataset['TotalChemicalFertilizer']
+dataset_test['TotalOrganicFertilizer'] = dataset_test['Ganaura'] + dataset_test['CropOrgFYM']
+dataset_test['TotalChemicalFertilizer'] = dataset_test['BasalDAP'] + dataset_test['BasalUrea'] + dataset_test['1tdUrea'] + dataset_test['2tdUrea']
+dataset_test['TotalFertilizerUsed'] = dataset_test['TotalOrganicFertilizer'] + dataset_test['TotalChemicalFertilizer']
 
 # Create the ratio feature again
 dataset['Organic_Chemical_Fertilizer_Ratio'] = dataset['TotalOrganicFertilizer'] / dataset['TotalChemicalFertilizer']
-dataset['Organic_Chemical_Fertilizer_Ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace inf with NaN for division by zero cases
+dataset['Organic_Total_Fertilizer_Ratio'] = dataset['TotalOrganicFertilizer'] / dataset['TotalFertilizerUsed']
+dataset_test['Organic_Chemical_Fertilizer_Ratio'] = dataset_test['TotalOrganicFertilizer'] / dataset_test['TotalChemicalFertilizer']
+dataset_test['Organic_Total_Fertilizer_Ratio'] = dataset_test['TotalOrganicFertilizer'] / dataset_test['TotalFertilizerUsed']
+dataset['Organic_Chemical_Fertilizer_Ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace inf with NaN for division by zero cases, actually no in our case.
+dataset_test['Organic_Chemical_Fertilizer_Ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace inf with NaN for division by zero cases, actually no in our case.
+
+"""
+print(dataset['Organic_Chemical_Fertilizer_Ratio'].isnull().sum(), "NaNs in Organic_Chemical_Fertilizer_Ratio")
+print(dataset_test['Organic_Chemical_Fertilizer_Ratio'].isnull().sum(), "NaNs in Organic_Chemical_Fertilizer_Ratio")
+sys.exit()
+"""
 
 # Create Polynomial Features: Squared terms for significant numerical features like CultLand and CropCultLand again
 dataset['CultLand_Squared'] = dataset['CultLand'] ** 2
 dataset['CropCultLand_Squared'] = dataset['CropCultLand'] ** 2
-
-# Calculate the total fertilizer used again
-dataset['TotalFertilizerUsed'] = dataset['TotalOrganicFertilizer'] + dataset['TotalChemicalFertilizer']
-
-# Calculate the Yield per kg of total fertilizer used again, replacing infinities with NaN
-dataset['Yield_per_kg_Fertilizer'] = dataset['Yield'] / dataset['TotalFertilizerUsed']
-dataset['Yield_per_kg_Fertilizer'].replace([np.inf, -np.inf], np.nan, inplace=True)
-
-# Showing the new features again
-new_features = dataset[['TotalOrganicFertilizer', 'TotalChemicalFertilizer', 'Organic_Chemical_Fertilizer_Ratio',
-                        'CultLand_Squared', 'CropCultLand_Squared', 'TotalFertilizerUsed', 'Yield_per_kg_Fertilizer']].head()
-new_features
+dataset_test['CultLand_Squared'] = dataset_test['CultLand'] ** 2
+dataset_test['CropCultLand_Squared'] = dataset_test['CropCultLand'] ** 2
 
 # Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
 dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea'] + dataset['BasalUrea']
 dataset_test['TotalUrea'] = dataset_test['1tdUrea'] + dataset_test['2tdUrea'] + dataset_test['BasalUrea']
+
 
 # Do the same for 1appDaysUrea and 2appDaysUrea
 dataset['1appDaysUrea'] = dataset['1appDaysUrea'].fillna(0)
@@ -332,36 +345,24 @@ dataset_test['2appDaysUrea'] = dataset_test['2appDaysUrea'].fillna(0)
 dataset['TotalAppDaysUrea'] = dataset['1appDaysUrea'] + dataset['2appDaysUrea']
 dataset_test['TotalAppDaysUrea'] = dataset_test['1appDaysUrea'] + dataset_test['2appDaysUrea']
 
-# Fill the Ganaura and CropOrgFYM with 0
-dataset['Ganaura'] = dataset['Ganaura'].fillna(0)
-dataset['CropOrgFYM'] = dataset['CropOrgFYM'].fillna(0)
-dataset_test['Ganaura'] = dataset_test['Ganaura'].fillna(0)
-dataset_test['CropOrgFYM'] = dataset_test['CropOrgFYM'].fillna(0)
+dataset['Org_Crop'] = dataset['OrgFertilizers'].astype(str) + " + " + dataset['CropbasalFerts'].astype(str)
+dataset_test['Org_Crop'] = dataset_test['OrgFertilizers'].astype(str) + "+" + dataset_test['CropbasalFerts'].astype(str)
+dataset['Crop_FirstTop'] = dataset['CropbasalFerts'].astype(str) + "+" + dataset['FirstTopDressFert'].astype(str)
+dataset_test['Crop_FirstTop'] = dataset_test['CropbasalFerts'].astype(str) + "+" + dataset_test['FirstTopDressFert'].astype(str)
+dataset['Org_FirstTop'] = dataset['OrgFertilizers'].astype(str) + "+" + dataset['FirstTopDressFert'].astype(str)
+dataset_test['Org_FirstTop'] = dataset_test['OrgFertilizers'].astype(str) + "+" + dataset_test['FirstTopDressFert'].astype(str)
 
-# Create cross features, cross between: CropEstMethod and [TransDetFactor,TransplantingIrrigationHours, 
-# TransplantingIrrigationSource, TransplantingIrrigationPowerSource, TransIrriCost, StandingWater, OrgFertilizers]
-dataset['CropEstMethod_TransDetFactor'] = dataset['CropEstMethod'].astype(str) + "_" + dataset['TransDetFactor'].astype(str)
-dataset_test['CropEstMethod_TransDetFactor'] = dataset_test['CropEstMethod'].astype(str) + "_" + dataset_test['TransDetFactor'].astype(str)
-
-# Check the unique values of the cross features
-print(dataset['CropEstMethod'].unique(), "Unique values of CropEstMethod")
-
-dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')   
-dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('None')
-
-dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('None')
-dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('None')
-
-dataset['BasalDAP'] = dataset['BasalDAP'].fillna(0)
-dataset_test['BasalDAP'] = dataset_test['BasalDAP'].fillna(0)    
+dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('other')
+dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('other')
 
 # If CropEstMethod is None, then fill the TransIrriCost with 0
 # if CropEstMethod is not none, then fill the StandingWater with median
 dataset['TransIrriCost'] = dataset['TransIrriCost'].fillna(0)   
 dataset_test['TransIrriCost'] = dataset_test['TransIrriCost'].fillna(0)
 
-dataset['TransplantingIrrigationPowerSource'] = dataset['TransplantingIrrigationPowerSource'].fillna('None')
-dataset_test['TransplantingIrrigationPowerSource'] = dataset_test['TransplantingIrrigationPowerSource'].fillna('None')
+"""
+dataset['TransplantingIrrigationPowerSource'] = dataset['TransplantingIrrigationPowerSource'].fillna('other')
+dataset_test['TransplantingIrrigationPowerSource'] = dataset_test['TransplantingIrrigationPowerSource'].fillna('other')
 
 dataset['SeedlingsPerPit'] = dataset['SeedlingsPerPit'].fillna(0)    
 dataset_test['SeedlingsPerPit'] = dataset_test['SeedlingsPerPit'].fillna(0)
@@ -369,8 +370,25 @@ dataset_test['SeedlingsPerPit'] = dataset_test['SeedlingsPerPit'].fillna(0)
 print(dataset['TransIrriCost'].unique())
 
 print(dataset.shape, dataset_test.shape)
+
+"""
 # print(dataset.columns)
-print(dataset.info())
+# Fill the missing values in those columns with 0 and mode
+dataset['TransplantingIrrigationHours'] = dataset['TransplantingIrrigationHours'].fillna(0)
+dataset_test['TransplantingIrrigationHours'] = dataset_test['TransplantingIrrigationHours'].fillna(0)
+dataset['TransplantingIrrigationSource'] = dataset['TransplantingIrrigationSource'].fillna(dataset['TransplantingIrrigationSource'].mode()[0])
+dataset_test['TransplantingIrrigationSource'] = dataset_test['TransplantingIrrigationSource'].fillna(dataset_test['TransplantingIrrigationSource'].mode()[0])
+dataset['TransplantingIrrigationPowerSource'] = dataset['TransplantingIrrigationPowerSource'].fillna(dataset['TransplantingIrrigationPowerSource'].mode()[0])
+dataset_test['TransplantingIrrigationPowerSource'] = dataset_test['TransplantingIrrigationPowerSource'].fillna(dataset_test['TransplantingIrrigationPowerSource'].mode()[0])
+
+# check the unique value of the SeedlingsPerPit column，fill it with 0
+# fill harv_hand_rent with 0
+dataset['Harv_hand_rent'] = dataset['Harv_hand_rent'].fillna(0)
+dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
+# fill seeHarv_date_RcNursEstDate
+print(dataset['Harv_date_RcNursEstDate'].unique())
+
+# print(dataset.info())
 
 sys.exit()
 
