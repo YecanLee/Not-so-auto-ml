@@ -2,6 +2,13 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+# Use ensemble to train the model
+from sklearn.ensemble import VotingRegressor
+from sklearn.model_selection import cross_val_score
+import numpy as np
+import pandas as pd
+import lightgbm as lgb
+import sys
 import sys
 
 # In the second part of the notebook
@@ -31,7 +38,14 @@ dataset = pd.read_csv(path)
 # Checking the unique values for categorical variables to identify sparse classes
 categorical_columns = dataset.select_dtypes(include=['object']).columns
 sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
-print(sparse_classes)
+# print(sparse_classes)
+
+dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
+dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
+dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
+dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna('other')
+dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna('other')
+dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna('other')
 
 
 # Define a threshold for grouping
@@ -54,12 +68,14 @@ for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstT
     dataset = group_sparse_classes(dataset, col, threshold)
 
 # Check the new number of unique values for the grouped columns
-grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
+grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 
+                                                           'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
 # Fill the missing values in the categorical columns with 'other', with the exception of 'LandPreparationMethod'
-dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
-dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
-dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
-#print(grouped_classes)
+# dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
+# dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
+# dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
+# print(grouped_classes)
+
 #print(dataset.shape, dataset.columns)
 
 # Prediction with the test dataset
@@ -96,18 +112,12 @@ def adjust_test_categories(train_df, test_df, column):
     return test_df
 
 # Apply the category adjustment to the test dataset based on the training dataset categories
-for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']:
+for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']:
     test_dataset = adjust_test_categories(dataset, dataset_test, col)
 
 # Check the new number of unique values for the grouped columns in the test dataset after the adjustment
-adjusted_unique_values_test = {col: dataset_test[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
-
-# print(adjusted_unique_values_test)
-
-# Fill the missing value like in the training dataset
-dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('other')
-dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna('other')
-dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna('other')
+adjusted_unique_values_test = {col: dataset_test[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 
+                                                                           'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
 
 # print(dataset.columns == dataset_test.columns)
 ###-----------###
@@ -118,9 +128,18 @@ moderate_skewed_features = ['BasalDAP', 'Acre',
                             'TransIrriCost', 'Ganaura',
                             'BasalUrea', 'TransplantingIrrigationHours']
 
-# Fill the high_skewed_features with 0
-dataset[high_skewed_features] = dataset[high_skewed_features].fillna(0)
-dataset_test[high_skewed_features] = dataset_test[high_skewed_features].fillna(0)
+# Fill the high_skewed_features with median, ALERT, maybe 0 is better!
+dataset[high_skewed_features] = dataset[high_skewed_features].fillna(dataset[high_skewed_features].median())
+dataset_test[high_skewed_features] = dataset_test[high_skewed_features].fillna(dataset_test[high_skewed_features].median())
+
+# Fill the low_skewed_features with median
+dataset[low_skewed_features] = dataset[low_skewed_features].fillna(dataset[low_skewed_features].median())
+dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(dataset_test[low_skewed_features].median())
+
+# Fill the moderate_skewed_features with median 
+dataset[moderate_skewed_features] = dataset[moderate_skewed_features].fillna(dataset[moderate_skewed_features].median())
+dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median())
+
 
 # Outlier remove preprocessing
 # Cap at 99th percentile
@@ -130,11 +149,6 @@ for feature in moderate_skewed_features:
     dataset.loc[dataset[feature] > percentile_value, feature] = percentile_value
     dataset_test.loc[dataset_test[feature] > percentile_value_test, feature] = percentile_value_test
 
-print(dataset['NursDetFactor'].dtype)
-#print(dataset['TransDetFactor'].nunique())   
-#print(dataset['CultLand'].nunique())  
-#print(dataset['CropCultLand'].nunique())
-sys.exit()
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
@@ -196,7 +210,9 @@ dataset.loc[dataset['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset['Nurs
 dataset_test.loc[dataset_test['RcNursEstDate'].isnull(), 'NursDetFactor'] = 'None'
 dataset_test.loc[dataset_test['RcNursEstDate'].notnull(), 'NursDetFactor'] = dataset_test['NursDetFactor'].mode()[0]
 
-# print(dataset.info())
+# Fill the missing value with MineralFertAppMethod.1 with mode
+dataset['MineralFertAppMethod.1'] = dataset['MineralFertAppMethod.1'].fillna(dataset['MineralFertAppMethod.1'].mode()[0])
+dataset_test['MineralFertAppMethod.1'] = dataset_test['MineralFertAppMethod.1'].fillna(dataset_test['MineralFertAppMethod.1'].mode()[0])
 
 # Datetime features generator
 date_features = ['CropTillageDate', 'RcNursEstDate', 'SeedingSowingTransplanting', 'Harv_date', 'Threshing_date']
@@ -398,18 +414,153 @@ dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
 #print(dataset['Harv_date_RcNursEstDate'].unique())
 
 # print(dataset.info())
+# check which columns have missing values
+# print(dataset.isnull().sum())
 # check the unique value of every columns  in the dataset
-print(dataset.nunique())
-sys.exit()
+# print(dataset.nunique())
 
 # The following columns have too many unique values right now, we will cut them into bins
+"""['CultLand', 'CropCultLand', 'TransIrriCost', 'Harv_hand_rent', 
+ 'Harv_date_SeedingSowingTransplanting', 'Harv_date_RcNursEstDate', 'Harv_date_CropTillageDate', 'Threshing_date_Harv_date',
+ 'TotalChemicalFertilizer', 'TotalFertilizerUsed', 'Organic_Chemical_Fertilizer_Ratio', 'Organic_Total_Fertilizer_Ratio']"""
+
+# print(dataset.shape, dataset_test.shape)
+
+for col in dataset.columns:
+    if dataset[col].dtype == 'object':
+        dataset[col] = dataset[col].astype('category').cat.codes
+    elif dataset[col].dtype == 'datetime64[ns]':
+        dataset = dataset.drop(columns=[col])
+
+for col in dataset_test.columns:
+    if dataset_test[col].dtype == 'object':
+        dataset_test[col] = dataset_test[col].astype('category').cat.codes
+    elif dataset_test[col].dtype == 'datetime64[ns]':
+        dataset_test = dataset_test.drop(columns=[col])
+
+# A simple test with the lightgbm
+# Prepare the data
+X = dataset
+y = train_labels    
+
+# Train Test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=100)
+
+# print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+
+# Select the object columns and categorical columns
+object_cols = X_train.select_dtypes(include=['object'])
+categorical_cols = X_train.select_dtypes(include=['category'])
+whole_categorical_cols = pd.concat([object_cols, categorical_cols], axis=1) 
+# generate a list with the name of the categorical columns
+whole_categorical_cols = whole_categorical_cols.columns
+# Transfer into a list
+whole_categorical_cols = list(whole_categorical_cols)
 
 
-
+# datetime_columns = dataset.select_dtypes(include=[np.datetime64]).columns.tolist()
+# datetime_columns_test = dataset_test.select_dtypes(include=[np.datetime64]).columns.tolist()
 
 # debug
-print(set(dataset.columns) == set(dataset_test.columns))
+# print(set(dataset.columns) == set(dataset_test.columns))
+# print(dataset.shape, dataset_test.shape, "\n This is the shape after feature generation")
 
+# Create a LightGBM model
+lgbm_model = lgb.LGBMRegressor(objective = 'regression', num_leaves = 31, learning_rate = 0.05, n_estimators = 200)
+
+"""
+from sklearn.ensemble import StackingRegressor
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=200)
+
+# Add other base models here
+base_estimators = [
+    ('lgbm', lgbm_model),
+    # Add here more base models
+]
+
+stacking_model = StackingRegressor(estimators=base_estimators, final_estimator=lgb.LGBMRegressor())
+
+# Train the stacking model
+stacking_model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = stacking_model.predict(X_test)
+
+# Calculate RMSE
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(rmse)
+
+# Test with dataset_test
+y_pred_test = stacking_model.predict(dataset_test)
+
+# Create submission DataFrame
+submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
+submission_df.to_csv('submission_07_11.csv', index=False)
+
+sys.exit()
+
+"""
+# Create base models
+lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=200)
+
+
+estimators = [('lgbm', lgbm_model)]
+ensemble = VotingRegressor(estimators, weights=[1]) 
+ensemble.fit(X_train, y_train)
+y_pred = ensemble.predict(X_test)
+
+# Calculate RMSE
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(rmse)
+
+# Test with dataset_test
+y_pred_test = ensemble.predict(dataset_test)
+
+# Create a submission file
+dataset_upload = dataset_test_original
+
+# Create a submission DataFrame
+submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
+submission_df.to_csv('submission_07_11_3.csv', index=False)
+
+sys.exit()
+
+# lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=100, feature_fraction=0.9, bagging_freq = 10, bagging_fraction = 0.9)
+
+# Train the model#########
+lgbm_model.fit(X_train, y_train, eval_set=[(X_test, y_test)], eval_metric='mae',
+                categorical_feature=whole_categorical_cols)
+
+#########
+# print(lgbm_model.best_iteration_)
+# Make predictions
+y_pred = lgbm_model.predict(X_test)
+#y_pred = lgbm_model.predict(X_test, num_iteration=lgbm_model.best_iteration_)
+
+# Calculate RMSE
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(rmse)
+
+# Test with dataset_test
+y_pred_test = lgbm_model.predict(dataset_test, num_iteration=lgbm_model.best_iteration_)
+
+# Create a submission file
+dataset_upload = pd.read_csv(r'C:\Users\ra78lof\Not-so-auto-ml\Test.csv')
+#print(dataset_upload.shape)
+# Create a submission file
+submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
+#print(submission_df.head())
+#print(submission_df.shape)
+submission_df.to_csv('submission_07_11.csv', index=False)
+
+sys.exit()
+###-----------###   Training beta test  ###-----------###
+
+# debug
+# print(set(dataset.columns) == set(dataset_test.columns))
 # Perform one-hot encoding
 
 # Step 1: Combine the datasets
@@ -497,7 +648,6 @@ dataset_test['Block'] = dataset_test_original['Block']
 # debug
 print(set(dataset.columns) == set(dataset_test.columns))
 
-
 """
 Got a bug , here is the error message:
 ValueError: pandas dtypes must be int, float or bool.
@@ -528,7 +678,6 @@ print(dataset.shape, dataset_test.shape, "\n This is the shape after feature gen
 # Re-attach the 'Yield' column to the training dataset
 dataset['Yield'] = train_labels
 dataset['Yield'] = dataset['Yield'].fillna(dataset['Yield'].median()) 
-
 
 # debug
 print(set(dataset.columns) == set(dataset_test.columns))
@@ -606,7 +755,7 @@ print(dataset.select_dtypes(include=['category']).shape[1], "After handling cate
 # How many numerical features are there now
 print(dataset.select_dtypes(include=['number']).shape[1],  "After handling numerical features")
 
-sys.exit()
+
 # A simple test with the lightgbm
 # Prepare the data
 X = dataset.drop(columns=['Yield']) 
@@ -641,10 +790,8 @@ X.loc[:, categorical_cols.columns] = filled_categorical_cols
 # Test if X still has NaNs
 print(X.isnull().sum().sum(), "After handling missing values for categorical features")
 
-
 # Figure out which column has a dtype of 'object'
 # print(X.dtypes[X.dtypes == 'object'])
-
 
 # Convert Object dtype to category dtype
 # categorical_cols = ['District', 'Block', 'SeedlingsPerPit_Binned', 'NoFertilizerAppln_Binned']
