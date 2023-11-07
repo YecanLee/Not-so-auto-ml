@@ -31,8 +31,8 @@ dataset = pd.read_csv(path)
 # Checking the unique values for categorical variables to identify sparse classes
 categorical_columns = dataset.select_dtypes(include=['object']).columns
 sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
+print(sparse_classes)
 
-# print(sparse_classes)
 
 # Define a threshold for grouping
 # Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
@@ -50,17 +50,17 @@ def group_sparse_classes(df, column, threshold):
     return df
 
 # Apply grouping for the identified categorical variables with many unique values
-for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']:
+for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']:
     dataset = group_sparse_classes(dataset, col, threshold)
 
 # Check the new number of unique values for the grouped columns
-grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert']}
+grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
 # Fill the missing values in the categorical columns with 'other', with the exception of 'LandPreparationMethod'
 dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
 dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
 dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
-# print(grouped_classes)
-# print(dataset.shape, dataset.columns)
+#print(grouped_classes)
+#print(dataset.shape, dataset.columns)
 
 # Prediction with the test dataset
 test_path = r'C:\Users\ra78lof\Not-so-auto-ml\Test.csv'
@@ -130,6 +130,11 @@ for feature in moderate_skewed_features:
     dataset.loc[dataset[feature] > percentile_value, feature] = percentile_value
     dataset_test.loc[dataset_test[feature] > percentile_value_test, feature] = percentile_value_test
 
+print(dataset['NursDetFactor'].dtype)
+#print(dataset['TransDetFactor'].nunique())   
+#print(dataset['CultLand'].nunique())  
+#print(dataset['CropCultLand'].nunique())
+sys.exit()
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
@@ -396,6 +401,11 @@ dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
 # check the unique value of every columns  in the dataset
 print(dataset.nunique())
 sys.exit()
+
+# The following columns have too many unique values right now, we will cut them into bins
+
+
+
 
 # debug
 print(set(dataset.columns) == set(dataset_test.columns))
