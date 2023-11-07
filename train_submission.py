@@ -74,7 +74,9 @@ grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMetho
 # dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
 # dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
 # dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
-# print(grouped_classes)
+print(dataset['LandPreparationMethod'].unique())
+
+sys.exit()
 
 #print(dataset.shape, dataset.columns)
 
@@ -444,7 +446,7 @@ X = dataset
 y = train_labels    
 
 # Train Test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=100)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.01, random_state=100)
 
 # print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 
