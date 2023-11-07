@@ -205,16 +205,20 @@ date_features = ['CropTillageDate', 'RcNursEstDate', 'SeedingSowingTransplanting
 # Harvest_date - SeedingSowingTransplanting
 # 'Harv_date', 'SeedingSowingTransplanting', 'Harv_date_SeedingSowingTransplanting' and 'RcNursEstDate' are all datetime features
 # Fill the 'Harv_date', 'SeedingSowingTransplanting', 'Harv_date_SeedingSowingTransplanting' and 'RcNursEstDate' with median
-dataset['Harv_date'] = dataset['Harv_date'].fillna(dataset['Harv_date'].median())
-dataset['SeedingSowingTransplanting'] = dataset['SeedingSowingTransplanting'].fillna(dataset['SeedingSowingTransplanting'].median())
-dataset['RcNursEstDate'] = dataset['RcNursEstDate'].fillna(dataset['RcNursEstDate'].median())
-dataset['Threshing_date'] = dataset['Threshing_date'].fillna(dataset['Threshing_date'].median())
-dataset['CropTillageDate'] = dataset['CropTillageDate'].fillna(dataset['CropTillageDate'].median())
-dataset_test['Harv_date'] = dataset_test['Harv_date'].fillna(dataset_test['Harv_date'].median())
-dataset_test['SeedingSowingTransplanting'] = dataset_test['SeedingSowingTransplanting'].fillna(dataset_test['SeedingSowingTransplanting'].median())
-dataset_test['RcNursEstDate'] = dataset_test['RcNursEstDate'].fillna(dataset_test['RcNursEstDate'].median())
-dataset_test['Threshing_date'] = dataset_test['Threshing_date'].fillna(dataset_test['Threshing_date'].median())
-dataset_test['CropTillageDate'] = dataset_test['CropTillageDate'].fillna(dataset_test['CropTillageDate'].median())
+# Convert the datetime to numeric form (Unix timestamp)
+# Forward-fill missing datetime values
+dataset['Harv_date'] = pd.to_datetime(dataset['Harv_date']).ffill()
+dataset['SeedingSowingTransplanting'] = pd.to_datetime(dataset['SeedingSowingTransplanting']).ffill()
+dataset['RcNursEstDate'] = pd.to_datetime(dataset['RcNursEstDate']).ffill()
+dataset['Threshing_date'] = pd.to_datetime(dataset['Threshing_date']).ffill()
+dataset['CropTillageDate'] = pd.to_datetime(dataset['CropTillageDate']).ffill()
+
+# If you need to forward-fill on the test dataset, you do it similarly:
+dataset_test['Harv_date'] = pd.to_datetime(dataset_test['Harv_date']).ffill()
+dataset_test['SeedingSowingTransplanting'] = pd.to_datetime(dataset_test['SeedingSowingTransplanting']).ffill()
+dataset_test['RcNursEstDate'] = pd.to_datetime(dataset_test['RcNursEstDate']).ffill()
+dataset_test['Threshing_date'] = pd.to_datetime(dataset_test['Threshing_date']).ffill()
+dataset_test['CropTillageDate'] = pd.to_datetime(dataset_test['CropTillageDate']).ffill()
 
 dataset['Harv_date'] = pd.to_datetime(dataset['Harv_date'], errors='coerce')
 dataset['SeedingSowingTransplanting'] = pd.to_datetime(dataset['SeedingSowingTransplanting'], errors='coerce')
@@ -226,7 +230,7 @@ dataset_test['Harv_date_SeedingSowingTransplanting'] = (dataset_test['Harv_date'
 # Harvest_date - RcNursEstDate
 dataset['RcNursEstDate'] = pd.to_datetime(dataset['RcNursEstDate'], errors='coerce')
 dataset_test['RcNursEstDate'] = pd.to_datetime(dataset_test['RcNursEstDate'], errors='coerce')
-print(dataset['RcNursEstDate'].unique())
+# print(dataset['RcNursEstDate'].unique())
 # print(dataset['RcNursEstDate'].dtype)
 # If the Harv_date_RcNursEstDate is smaller than 0, add 365 to it
 dataset['Harv_date_RcNursEstDate'] = (dataset['Harv_date'] - dataset['RcNursEstDate']).dt.days
@@ -285,7 +289,7 @@ dataset = dataset.drop(columns=date_features)
 dataset_test = dataset_test.drop(columns=date_features)
 
 # debug
-print(set(dataset.columns) == set(dataset_test.columns))
+# print(set(dataset.columns) == set(dataset_test.columns))
 
 # Fill missing values in 1tdUrea and 2tdUrea with 0, as they will be summed
 dataset['BasalUrea'] = dataset['BasalUrea'].fillna(0)
@@ -386,10 +390,11 @@ dataset_test['TransplantingIrrigationPowerSource'] = dataset_test['Transplanting
 dataset['Harv_hand_rent'] = dataset['Harv_hand_rent'].fillna(0)
 dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
 # fill seeHarv_date_RcNursEstDate
-print(dataset['Harv_date_RcNursEstDate'].unique())
+#print(dataset['Harv_date_RcNursEstDate'].unique())
 
 # print(dataset.info())
-
+# check the unique value of every columns  in the dataset
+print(dataset.nunique())
 sys.exit()
 
 # debug
