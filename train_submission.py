@@ -35,22 +35,51 @@ dataset = pd.read_csv(path)
 # print(dataset.shape) (3870, 44)
 # dataset.head()
 
+"""
+dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')
+dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('None')
+dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('None')
+dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna('None')
+dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna('None')
+dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna('None')
+dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('other')
+"""
+# check which column has huge missing values
+print(dataset.isnull().sum())
+
+import numpy as np
+"""
+# For each column you want to fill with a distribution of its own values
+for column in ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 
+               'NursDetFactor', 'LandPreparationMethod', 'TransDetFactor', 
+               'PCropSolidOrgFertAppMethod']:
+    
+    # Get the distribution of non-null values
+    values_count = dataset[column].value_counts(normalize=True)
+
+    # Generate random values following the distribution
+    fill_values = np.random.choice(values_count.index, size=dataset[column].isna().sum(), p=values_count.values)
+    
+    # Fill the NaNs with the generated values
+    dataset.loc[dataset[column].isna(), column] = fill_values
+
+"""
+
+# For categorical columns, use the mode to fill missing values
+categorical_columns = ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 
+                       'NursDetFactor', 'LandPreparationMethod', 'TransDetFactor', 
+                       'PCropSolidOrgFertAppMethod']
+
+for column in categorical_columns:
+    mode_value = dataset[column].mode()[0]  # [0] is used to select the mode value in case there are multiple modes
+    dataset[column] = dataset[column].fillna(mode_value)
+
 # Checking the unique values for categorical variables to identify sparse classes
 categorical_columns = dataset.select_dtypes(include=['object']).columns
 sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
-# print(sparse_classes)
-
-dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
-dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
-dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
-dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna('other')
-dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna('other')
-dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna('other')
-
-
 # Define a threshold for grouping
 # Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
-threshold_percentage = 5
+threshold_percentage = 1
 threshold = len(dataset) * (threshold_percentage / 100)
 
 # Function to group sparse classes
@@ -75,8 +104,12 @@ grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMetho
 # dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
 # dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
 print(dataset['LandPreparationMethod'].unique())
+print(dataset['LandPreparationMethod'].value_counts())
+dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna(dataset['LandPreparationMethod'].mode()[0])
+print(dataset['OrgFertilizers'].unique())
+print(dataset['OrgFertilizers'].value_counts())
 
-sys.exit()
+
 
 #print(dataset.shape, dataset.columns)
 
@@ -86,6 +119,13 @@ dataset_test = pd.read_csv(test_path)
 # print(dataset_test.shape)
 # dataset_test.head()
 
+dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('None')
+dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna('None')
+dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna('None')
+dataset_test['NursDetFactor'] = dataset_test['NursDetFactor'].fillna('None')
+dataset_test['LandPreparationMethod'] = dataset_test['LandPreparationMethod'].fillna('None')
+dataset_test['TransDetFactor'] = dataset_test['TransDetFactor'].fillna('None')
+dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('other')
 # print(set(dataset.columns) == set(dataset_test.columns))
 # print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
 # 'Yield' is the target variable, so it's not in the test dataset
@@ -142,7 +182,7 @@ dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(dat
 dataset[moderate_skewed_features] = dataset[moderate_skewed_features].fillna(dataset[moderate_skewed_features].median())
 dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median())
 
-
+"""
 # Outlier remove preprocessing
 # Cap at 99th percentile
 for feature in moderate_skewed_features:
@@ -165,7 +205,7 @@ for feature in low_skewed_features:
     outlier_indices_test = dataset_test[feature].dropna().index[abs_z_scores_test > 3]
     dataset.loc[outlier_indices, feature] = median_value
     dataset_test.loc[outlier_indices_test, feature] = median_value_test
-
+"""
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
@@ -185,22 +225,25 @@ for feature in low_skewed_features:
 # Binning the SeedlingsPerPit
 dataset['SeedlingsPerPit'] = dataset['SeedlingsPerPit'].fillna(0)
 dataset_test['SeedlingsPerPit'] = dataset_test['SeedlingsPerPit'].fillna(0)
+
+"""
 bins_SeedlingsPerPit = [0, 2, 4, np.inf]
 labels_SeedlingsPerPit = ['Low', 'Medium', 'High']
 dataset['SeedlingsPerPit_Binned'] = pd.cut(dataset['SeedlingsPerPit'], bins=bins_SeedlingsPerPit, labels=labels_SeedlingsPerPit)
 dataset_test['SeedlingsPerPit_Binned'] = pd.cut(dataset_test['SeedlingsPerPit'], bins=bins_SeedlingsPerPit, labels=labels_SeedlingsPerPit)
-
+"""
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
 # print(dataset['NoFertilizerAppln'].unique())
 dataset['NoFertilizerAppln'].value_counts().sort_index()
 
+"""
 bins_NoFertilizerAppln = [0, 1, 2, np.inf]
 labels_NoFertilizerAppln = ['Low', 'Medium', 'High']
 dataset['NoFertilizerAppln_Binned'] = pd.cut(dataset['NoFertilizerAppln'], bins=bins_NoFertilizerAppln, labels=labels_NoFertilizerAppln)
 dataset_test['NoFertilizerAppln_Binned'] = pd.cut(dataset_test['NoFertilizerAppln'], bins=bins_NoFertilizerAppln, labels=labels_NoFertilizerAppln)
-
+"""
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 # print(dataset['RcNursEstDate'].unique())
@@ -446,7 +489,7 @@ X = dataset
 y = train_labels    
 
 # Train Test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.01, random_state=100)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=300)
 
 # print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 
@@ -466,9 +509,6 @@ whole_categorical_cols = list(whole_categorical_cols)
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 # print(dataset.shape, dataset_test.shape, "\n This is the shape after feature generation")
-
-# Create a LightGBM model
-lgbm_model = lgb.LGBMRegressor(objective = 'regression', num_leaves = 31, learning_rate = 0.05, n_estimators = 200)
 
 """
 from sklearn.ensemble import StackingRegressor
@@ -505,8 +545,9 @@ submission_df.to_csv('submission_07_11.csv', index=False)
 sys.exit()
 
 """
-# Create base models
-lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=200)
+"""
+# Create a LightGBM model
+lgbm_model = lgb.LGBMRegressor(objective = 'regression', num_leaves = 31, learning_rate = 0.01, n_estimators = 120)
 
 
 estimators = [('lgbm', lgbm_model)]
@@ -527,10 +568,83 @@ dataset_upload = dataset_test_original
 # Create a submission DataFrame
 submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
 submission_df.to_csv('submission_07_11_3.csv', index=False)
+"""
+
+###-----------###   Training beta test  ###-----------###
+import lightgbm as lgb
+import numpy as np
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import KFold
+
+# Parameters
+n_splits = 5
+kf = KFold(n_splits=n_splits, shuffle=True, random_state=82)
+
+# Prepare an array to store the RMSE for each fold
+rmse_scores = []
+models = []
+
+# Initialize an empty array to hold feature importances
+feature_importances = np.zeros(X_train.shape[1])
+
+# Start the K-Fold cross-validation loop
+for fold, (train_index, val_index) in enumerate(kf.split(X_train)):
+    # Split the data
+    X_train_fold, X_val_fold = X_train.iloc[train_index], X_train.iloc[val_index]
+    y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
+
+    # Create a LGBMRegressor object
+    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=120)
+    
+    # Train the model
+    lgbm_model.fit(
+        X_train_fold, y_train_fold, 
+        eval_set=[(X_val_fold, y_val_fold)], 
+        eval_metric='rmse', 
+        categorical_feature=whole_categorical_cols
+    )
+    
+    # Predict on the validation set
+    y_pred_val = lgbm_model.predict(X_val_fold, num_iteration=lgbm_model.best_iteration_)
+
+    # Calculate and print RMSE for the current fold
+    fold_rmse = np.sqrt(mean_squared_error(y_val_fold, y_pred_val))
+    rmse_scores.append(fold_rmse)
+    print(f"Fold {fold}: RMSE: {fold_rmse}")
+
+    # Accumulate feature importances
+    feature_importances += lgbm_model.feature_importances_
+
+    models.append(lgbm_model)
+
+# After cross-validation, print the mean RMSE
+print(f"Mean RMSE: {np.mean(rmse_scores)}, STD RMSE: {np.std(rmse_scores)}")
+
+# Feature importances from all folds
+feature_importances = feature_importances / n_splits
+
+test_predictions = []
+
+for model in models:
+    # Make predictions
+    fold_preds = model.predict(dataset_test, num_iteration=model.best_iteration_)
+    test_predictions.append(fold_preds)
+
+# Now average these predictions
+test_predictions = np.column_stack(test_predictions)
+y_pred_test = np.mean(test_predictions, axis=1)
+
+# Now you have `y_pred_test` which is the averaged predictions from all folds
+
+# Create a submission file
+dataset_upload = dataset_test_original
+
+submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
+submission_df.to_csv('submission_07_11_567.csv', index=False)
 
 sys.exit()
 
-# lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=100, feature_fraction=0.9, bagging_freq = 10, bagging_fraction = 0.9)
+lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=100)
 
 # Train the model#########
 lgbm_model.fit(X_train, y_train, eval_set=[(X_test, y_test)], eval_metric='mae',
@@ -564,7 +678,6 @@ sys.exit()
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 # Perform one-hot encoding
-
 # Step 1: Combine the datasets
 combined = pd.concat([dataset, dataset_test], keys=['train', 'test'])
 
