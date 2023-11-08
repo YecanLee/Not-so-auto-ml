@@ -30,12 +30,11 @@ from sklearn.preprocessing import LabelEncoder
 # from sklearn.feature_selection import VarianceThreshold
 
 # Read the dataset
-path = r'C:\Users\ra78lof\Not-so-auto-ml\Train.csv'
+path = 'Train.csv'
 dataset = pd.read_csv(path)
 # print(dataset.shape) (3870, 44)
 # dataset.head()
-
-"""
+print(dataset.info())
 dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')
 dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('None')
 dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('None')
@@ -43,9 +42,8 @@ dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna('None')
 dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna('None')
 dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna('None')
 dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('other')
-"""
-# check which column has huge missing values
-print(dataset.isnull().sum())
+
+
 
 import numpy as np
 """
@@ -64,7 +62,7 @@ for column in ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert',
     dataset.loc[dataset[column].isna(), column] = fill_values
 
 """
-
+"""
 # For categorical columns, use the mode to fill missing values
 categorical_columns = ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 
                        'NursDetFactor', 'LandPreparationMethod', 'TransDetFactor', 
@@ -73,13 +71,13 @@ categorical_columns = ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert',
 for column in categorical_columns:
     mode_value = dataset[column].mode()[0]  # [0] is used to select the mode value in case there are multiple modes
     dataset[column] = dataset[column].fillna(mode_value)
-
+"""
 # Checking the unique values for categorical variables to identify sparse classes
 categorical_columns = dataset.select_dtypes(include=['object']).columns
 sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
 # Define a threshold for grouping
 # Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
-threshold_percentage = 1
+threshold_percentage = 5
 threshold = len(dataset) * (threshold_percentage / 100)
 
 # Function to group sparse classes
@@ -103,19 +101,24 @@ grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMetho
 # dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
 # dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
 # dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
+"""
 print(dataset['LandPreparationMethod'].unique())
 print(dataset['LandPreparationMethod'].value_counts())
 dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna(dataset['LandPreparationMethod'].mode()[0])
 print(dataset['OrgFertilizers'].unique())
 print(dataset['OrgFertilizers'].value_counts())
-
+"""
 
 
 #print(dataset.shape, dataset.columns)
 
 # Prediction with the test dataset
-test_path = r'C:\Users\ra78lof\Not-so-auto-ml\Test.csv'
+test_path = 'Test.csv'
 dataset_test = pd.read_csv(test_path)
+dataset_upload = dataset_test.copy()
+print(dataset_upload['ID'].head())
+
+dataset_test = dataset_test.drop(columns=['ID'], axis=1)
 # print(dataset_test.shape)
 # dataset_test.head()
 
@@ -132,11 +135,11 @@ dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppM
 
 # Save the 'Yield' column
 train_labels = dataset['Yield'].copy()
-dataset = dataset.drop(columns=['Yield'])
+dataset = dataset.drop(columns=['ID','Yield'], axis=1)
 
 # Copy the original dataset
-dataset_original = dataset.copy()
-dataset_test_original = dataset_test.copy()
+# dataset_original = dataset.copy()
+# dataset_test_original = dataset_test.copy()
 
 # print(set(dataset.columns) == set(dataset_test.columns))
 # print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
@@ -174,6 +177,7 @@ moderate_skewed_features = ['BasalDAP', 'Acre',
 dataset[high_skewed_features] = dataset[high_skewed_features].fillna(dataset[high_skewed_features].median())
 dataset_test[high_skewed_features] = dataset_test[high_skewed_features].fillna(dataset_test[high_skewed_features].median())
 
+"""
 # Fill the low_skewed_features with median
 dataset[low_skewed_features] = dataset[low_skewed_features].fillna(dataset[low_skewed_features].median())
 dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(dataset_test[low_skewed_features].median())
@@ -181,8 +185,8 @@ dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(dat
 # Fill the moderate_skewed_features with median 
 dataset[moderate_skewed_features] = dataset[moderate_skewed_features].fillna(dataset[moderate_skewed_features].median())
 dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median())
-
 """
+
 # Outlier remove preprocessing
 # Cap at 99th percentile
 for feature in moderate_skewed_features:
@@ -205,7 +209,7 @@ for feature in low_skewed_features:
     outlier_indices_test = dataset_test[feature].dropna().index[abs_z_scores_test > 3]
     dataset.loc[outlier_indices, feature] = median_value
     dataset_test.loc[outlier_indices_test, feature] = median_value_test
-"""
+
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
@@ -226,24 +230,25 @@ for feature in low_skewed_features:
 dataset['SeedlingsPerPit'] = dataset['SeedlingsPerPit'].fillna(0)
 dataset_test['SeedlingsPerPit'] = dataset_test['SeedlingsPerPit'].fillna(0)
 
-"""
+
 bins_SeedlingsPerPit = [0, 2, 4, np.inf]
 labels_SeedlingsPerPit = ['Low', 'Medium', 'High']
 dataset['SeedlingsPerPit_Binned'] = pd.cut(dataset['SeedlingsPerPit'], bins=bins_SeedlingsPerPit, labels=labels_SeedlingsPerPit)
 dataset_test['SeedlingsPerPit_Binned'] = pd.cut(dataset_test['SeedlingsPerPit'], bins=bins_SeedlingsPerPit, labels=labels_SeedlingsPerPit)
-"""
+
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
 # print(dataset['NoFertilizerAppln'].unique())
-dataset['NoFertilizerAppln'].value_counts().sort_index()
+# dataset['NoFertilizerAppln'].value_counts().sort_index()
 
-"""
+
 bins_NoFertilizerAppln = [0, 1, 2, np.inf]
 labels_NoFertilizerAppln = ['Low', 'Medium', 'High']
 dataset['NoFertilizerAppln_Binned'] = pd.cut(dataset['NoFertilizerAppln'], bins=bins_NoFertilizerAppln, labels=labels_NoFertilizerAppln)
 dataset_test['NoFertilizerAppln_Binned'] = pd.cut(dataset_test['NoFertilizerAppln'], bins=bins_NoFertilizerAppln, labels=labels_NoFertilizerAppln)
-"""
+
+
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 # print(dataset['RcNursEstDate'].unique())
@@ -315,6 +320,7 @@ dataset['Threshing_date'] = pd.to_datetime(dataset['Threshing_date'], errors='co
 dataset['Threshing_date_Harv_date'] = (dataset['Threshing_date'] - dataset['Harv_date']).dt.days
 dataset_test['Threshing_date'] = pd.to_datetime(dataset_test['Threshing_date'], errors='coerce')
 dataset_test['Threshing_date_Harv_date'] = (dataset_test['Threshing_date'] - dataset_test['Harv_date']).dt.days
+
 
 # Generate the month features, this will be transfered into one-hot encoding later
 dataset['Harv_date_Month'] = dataset['Harv_date'].dt.month
@@ -395,11 +401,13 @@ print(dataset_test['Organic_Chemical_Fertilizer_Ratio'].isnull().sum(), "NaNs in
 sys.exit()
 """
 
+"""
 # Create Polynomial Features: Squared terms for significant numerical features like CultLand and CropCultLand again
 dataset['CultLand_Squared'] = dataset['CultLand'] ** 2
 dataset['CropCultLand_Squared'] = dataset['CropCultLand'] ** 2
 dataset_test['CultLand_Squared'] = dataset_test['CultLand'] ** 2
 dataset_test['CropCultLand_Squared'] = dataset_test['CropCultLand'] ** 2
+"""
 
 # Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
 dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea'] + dataset['BasalUrea']
@@ -415,20 +423,21 @@ dataset_test['2appDaysUrea'] = dataset_test['2appDaysUrea'].fillna(0)
 dataset['TotalAppDaysUrea'] = dataset['1appDaysUrea'] + dataset['2appDaysUrea']
 dataset_test['TotalAppDaysUrea'] = dataset_test['1appDaysUrea'] + dataset_test['2appDaysUrea']
 
+"""
 dataset['Org_Crop'] = dataset['OrgFertilizers'].astype(str) + " + " + dataset['CropbasalFerts'].astype(str)
 dataset_test['Org_Crop'] = dataset_test['OrgFertilizers'].astype(str) + "+" + dataset_test['CropbasalFerts'].astype(str)
 dataset['Crop_FirstTop'] = dataset['CropbasalFerts'].astype(str) + "+" + dataset['FirstTopDressFert'].astype(str)
 dataset_test['Crop_FirstTop'] = dataset_test['CropbasalFerts'].astype(str) + "+" + dataset_test['FirstTopDressFert'].astype(str)
 dataset['Org_FirstTop'] = dataset['OrgFertilizers'].astype(str) + "+" + dataset['FirstTopDressFert'].astype(str)
 dataset_test['Org_FirstTop'] = dataset_test['OrgFertilizers'].astype(str) + "+" + dataset_test['FirstTopDressFert'].astype(str)
-
+"""
 dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('other')
 dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('other')
 
 # If CropEstMethod is None, then fill the TransIrriCost with 0
 # if CropEstMethod is not none, then fill the StandingWater with median
-dataset['TransIrriCost'] = dataset['TransIrriCost'].fillna(0)   
-dataset_test['TransIrriCost'] = dataset_test['TransIrriCost'].fillna(0)
+dataset['TransIrriCost'] = dataset['TransIrriCost'].fillna(dataset['TransIrriCost'].median()) 
+dataset_test['TransIrriCost'] = dataset_test['TransIrriCost'].fillna(dataset_test['TransIrriCost'].median())
 
 """
 dataset['TransplantingIrrigationPowerSource'] = dataset['TransplantingIrrigationPowerSource'].fillna('other')
@@ -468,8 +477,11 @@ dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
 """['CultLand', 'CropCultLand', 'TransIrriCost', 'Harv_hand_rent', 
  'Harv_date_SeedingSowingTransplanting', 'Harv_date_RcNursEstDate', 'Harv_date_CropTillageDate', 'Threshing_date_Harv_date',
  'TotalChemicalFertilizer', 'TotalFertilizerUsed', 'Organic_Chemical_Fertilizer_Ratio', 'Organic_Total_Fertilizer_Ratio']"""
-
-# print(dataset.shape, dataset_test.shape)
+# Drop the columns used to generate the new features, not the new features themselves
+dataset = dataset.drop(columns = ['BasalUrea', '1tdUrea', '2tdUrea', 'BasalDAP', 
+                                  'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month'], axis=1)
+dataset_test = dataset_test.drop(columns = ['BasalUrea', '1tdUrea', '2tdUrea', 'BasalDAP',
+                                            'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month'], axis=1)
 
 for col in dataset.columns:
     if dataset[col].dtype == 'object':
@@ -486,22 +498,24 @@ for col in dataset_test.columns:
 # A simple test with the lightgbm
 # Prepare the data
 X = dataset
-y = train_labels    
 
+y = train_labels    
+print(X.shape, y.shape)
 # Train Test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=300)
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=300)
 
 # print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 
 # Select the object columns and categorical columns
-object_cols = X_train.select_dtypes(include=['object'])
-categorical_cols = X_train.select_dtypes(include=['category'])
+object_cols = X.select_dtypes(include=['object'])
+categorical_cols = X.select_dtypes(include=['category'])
 whole_categorical_cols = pd.concat([object_cols, categorical_cols], axis=1) 
 # generate a list with the name of the categorical columns
 whole_categorical_cols = whole_categorical_cols.columns
 # Transfer into a list
 whole_categorical_cols = list(whole_categorical_cols)
 
+# make sure the ID column has been dropped from the dataset
 
 # datetime_columns = dataset.select_dtypes(include=[np.datetime64]).columns.tolist()
 # datetime_columns_test = dataset_test.select_dtypes(include=[np.datetime64]).columns.tolist()
@@ -577,29 +591,29 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
 # Parameters
-n_splits = 5
-kf = KFold(n_splits=n_splits, shuffle=True, random_state=82)
+n_splits = 20
+kf = KFold(n_splits=n_splits, shuffle=True, random_state=78)
 
 # Prepare an array to store the RMSE for each fold
 rmse_scores = []
 models = []
 
 # Initialize an empty array to hold feature importances
-feature_importances = np.zeros(X_train.shape[1])
+feature_importances = np.zeros(X.shape[1])
 
 # Start the K-Fold cross-validation loop
-for fold, (train_index, val_index) in enumerate(kf.split(X_train)):
+for fold, (train_index, val_index) in enumerate(kf.split(X)):
     # Split the data
-    X_train_fold, X_val_fold = X_train.iloc[train_index], X_train.iloc[val_index]
-    y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
+    X_train_fold, X_val_fold = X.iloc[train_index], X.iloc[val_index]
+    y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
 
     # Create a LGBMRegressor object
-    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=120)
+    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=100)
     
     # Train the model
     lgbm_model.fit(
-        X_train_fold, y_train_fold, 
-        eval_set=[(X_val_fold, y_val_fold)], 
+        X_train_fold, y_train_fold,  
+        eval_set=[(X_val_fold, y_val_fold)],
         eval_metric='rmse', 
         categorical_feature=whole_categorical_cols
     )
@@ -627,7 +641,9 @@ test_predictions = []
 
 for model in models:
     # Make predictions
-    fold_preds = model.predict(dataset_test, num_iteration=model.best_iteration_)
+    test_df = dataset_test[X.columns]
+    # print(test_df.shape)
+    fold_preds = model.predict(test_df, num_iteration=model.best_iteration_)
     test_predictions.append(fold_preds)
 
 # Now average these predictions
@@ -637,10 +653,12 @@ y_pred_test = np.mean(test_predictions, axis=1)
 # Now you have `y_pred_test` which is the averaged predictions from all folds
 
 # Create a submission file
-dataset_upload = dataset_test_original
+# Make predictions on the Zindi test set
+# test_df = dataset_test[X.columns]
+# y_pred_test = lgbm_model.predict(test_df, num_iteration=lgbm_model.best_iteration_)
 
 submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
-submission_df.to_csv('submission_07_11_567.csv', index=False)
+submission_df.to_csv('10_mae.csv', index=False)
 
 sys.exit()
 
