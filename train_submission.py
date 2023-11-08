@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-# Use ensemble to train the model
+
 from sklearn.ensemble import VotingRegressor
 from sklearn.model_selection import cross_val_score
 import numpy as np
@@ -11,10 +11,7 @@ import lightgbm as lgb
 import sys
 import sys
 
-# In the second part of the notebook
 from sklearn.preprocessing import LabelEncoder
-
-# This part of importing would be moved to main.py or train.py later
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import lightgbm as lgb
@@ -32,42 +29,32 @@ from sklearn.preprocessing import LabelEncoder
 # Read the dataset
 path = 'Train.csv'
 dataset = pd.read_csv(path)
-# print(dataset.shape) (3870, 44)
-# dataset.head()
-print(dataset.info())
+train_labels = dataset['Yield'].copy()
+dataset = dataset.drop(columns=['ID','Yield'], axis=1)
 
-# Prediction with the test dataset
 test_path = 'Test.csv'
 dataset_test = pd.read_csv(test_path)
 dataset_upload = dataset_test.copy()
-
 dataset_test = dataset_test.drop(columns=['ID'], axis=1)
-# print(dataset_test.shape)
-# dataset_test.head()
 
-# print(set(dataset.columns) == set(dataset_test.columns))
-# print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
-# 'Yield' is the target variable, so it's not in the test dataset
-
-# Save the 'Yield' column
-train_labels = dataset['Yield'].copy()
-dataset = dataset.drop(columns=['ID','Yield'], axis=1)
-dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna(dataset['OrgFertilizers'].mode()[0])
-dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna(dataset['CropbasalFerts'].mode()[0])
-dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna(dataset['FirstTopDressFert'].mode()[0])
-dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna(dataset['NursDetFactor'].mode()[0])
-dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna(dataset['LandPreparationMethod'].mode()[0])
+# If no OrganicFertilizer, then fill the OrgFertilizers with None, and fill PCropSolidOrgFertAppMethod with None
+dataset['Harv_hand_rent'] = dataset['Harv_hand_rent'].fillna(0)
+dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')
+dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('None')
+dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('None')
+dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna('None')
+dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna('None')
 dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna(dataset['TransDetFactor'].mode()[0])
-dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna(dataset['PCropSolidOrgFertAppMethod'].mode()[0])
+dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('None')
 
-dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna(dataset_test['OrgFertilizers'].mode()[0])
-dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna(dataset_test['CropbasalFerts'].mode()[0])
-dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna(dataset_test['FirstTopDressFert'].mode()[0])
-dataset_test['NursDetFactor'] = dataset_test['NursDetFactor'].fillna(dataset_test['NursDetFactor'].mode()[0])
-dataset_test['LandPreparationMethod'] = dataset_test['LandPreparationMethod'].fillna(dataset_test['LandPreparationMethod'].mode()[0])
+dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
+dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('None')
+dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna('None')
+dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna('None')
+dataset_test['NursDetFactor'] = dataset_test['NursDetFactor'].fillna('None')
+dataset_test['LandPreparationMethod'] = dataset_test['LandPreparationMethod'].fillna('None')
 dataset_test['TransDetFactor'] = dataset_test['TransDetFactor'].fillna(dataset_test['TransDetFactor'].mode()[0])
-dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna(dataset_test['PCropSolidOrgFertAppMethod'].mode()[0])
-
+dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('None')
 
 
 """
@@ -86,22 +73,13 @@ for column in ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert',
     dataset.loc[dataset[column].isna(), column] = fill_values
 
 """
-"""
-# For categorical columns, use the mode to fill missing values
-categorical_columns = ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 
-                       'NursDetFactor', 'LandPreparationMethod', 'TransDetFactor', 
-                       'PCropSolidOrgFertAppMethod']
 
-for column in categorical_columns:
-    mode_value = dataset[column].mode()[0]  # [0] is used to select the mode value in case there are multiple modes
-    dataset[column] = dataset[column].fillna(mode_value)
-"""
 # Checking the unique values for categorical variables to identify sparse classes
 categorical_columns = dataset.select_dtypes(include=['object']).columns
-sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 30}
+sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 30} 
+
 # Define a threshold for grouping
-# Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
-threshold_percentage = 5
+threshold_percentage = 1
 threshold = len(dataset) * (threshold_percentage / 100)
 
 # Function to group sparse classes
@@ -114,35 +92,14 @@ def group_sparse_classes(df, column, threshold):
     df[column] = df[column].replace(to_replace, 'other')
     return df
 
+# useless_columns = ['TransDetFactor', 'NursDetFactor'], this will be only useful later
+
 # Apply grouping for the identified categorical variables with many unique values
-for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']:
+for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts']:
     dataset = group_sparse_classes(dataset, col, threshold)
 
 # Check the new number of unique values for the grouped columns
-grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 
-                                                           'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
-# Fill the missing values in the categorical columns with 'other', with the exception of 'LandPreparationMethod'
-# dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('other')
-# dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('other')
-# dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('other')
-"""
-print(dataset['LandPreparationMethod'].unique())
-print(dataset['LandPreparationMethod'].value_counts())
-dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna(dataset['LandPreparationMethod'].mode()[0])
-print(dataset['OrgFertilizers'].unique())
-print(dataset['OrgFertilizers'].value_counts())
-"""
-
-
-#print(dataset.shape, dataset.columns)
-
-# Copy the original dataset
-# dataset_original = dataset.copy()
-# dataset_test_original = dataset_test.copy()
-
-# print(set(dataset.columns) == set(dataset_test.columns))
-# print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
-# The columns are the same now
+grouped_classes = {col: dataset[col].nunique() for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts']}
 
 # Adjust the function to use the categories from the training dataset
 def adjust_test_categories(train_df, test_df, column):
@@ -156,31 +113,23 @@ def adjust_test_categories(train_df, test_df, column):
     return test_df
 
 # Apply the category adjustment to the test dataset based on the training dataset categories
-for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']:
+for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts']:
     test_dataset = adjust_test_categories(dataset, dataset_test, col)
 
-# Check the new number of unique values for the grouped columns in the test dataset after the adjustment
-# adjusted_unique_values_test = {col: dataset_test[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 
-                                                                           #'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
-
-# print(dataset.columns == dataset_test.columns)
-###-----------###
-
 high_skewed_features = ['Residue_perc', 'StandingWater']
-low_skewed_features = ['Residue_length', 'CropOrgFYM', 'Harv_hand_rent', 'SeedlingsPerPit']
+# TOOOOOODOOOO, the log2, log10 will be tested 
+low_skewed_features = ['Residue_length', 'CropOrgFYM', 'SeedlingsPerPit'] # No missing value here
 moderate_skewed_features = ['BasalDAP', 'Acre', 
                             'TransIrriCost', 'Ganaura',
                             'BasalUrea', 'TransplantingIrrigationHours']
 
-# Fill the high_skewed_features with median, ALERT, maybe 0 is better!
-dataset[high_skewed_features] = dataset[high_skewed_features].fillna(dataset[high_skewed_features].median())
-dataset_test[high_skewed_features] = dataset_test[high_skewed_features].fillna(dataset_test[high_skewed_features].median())
-
-
+dataset['StandingWater'] = dataset['StandingWater'].fillna(0)
 # Fill the low_skewed_features with median
 dataset[low_skewed_features] = dataset[low_skewed_features].fillna(0)
 dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(0)
 
+print(dataset.info())
+sys.exit()
 # Fill the moderate_skewed_features with median 
 dataset[moderate_skewed_features] = dataset[moderate_skewed_features].fillna(dataset[moderate_skewed_features].median())
 dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median()) 
@@ -465,8 +414,7 @@ dataset_test['TransplantingIrrigationPowerSource'] = dataset_test['Transplanting
 
 # check the unique value of the SeedlingsPerPit column，fill it with 0
 # fill harv_hand_rent with 0
-dataset['Harv_hand_rent'] = dataset['Harv_hand_rent'].fillna(0)
-dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
+
 # fill seeHarv_date_RcNursEstDate
 #print(dataset['Harv_date_RcNursEstDate'].unique())
 
@@ -483,9 +431,9 @@ dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
 # Drop the columns used to generate the new features, not the new features themselves
 """
 dataset = dataset.drop(columns = ['BasalUrea', '1tdUrea', '2tdUrea', 'BasalDAP', 
-                                  'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month'], axis=1)
+                                  'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month', 'District', 'TransDetFactor'], axis=1)
 dataset_test = dataset_test.drop(columns = ['BasalUrea', '1tdUrea', '2tdUrea', 'BasalDAP',
-                                            'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month'], axis=1)
+                                            'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month', 'District', 'TransDetFactor'], axis=1)
 
 """
 dataset = dataset.drop(columns=['Harv_date_Month'], axis=1)
