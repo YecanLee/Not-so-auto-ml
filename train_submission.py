@@ -35,17 +35,41 @@ dataset = pd.read_csv(path)
 # print(dataset.shape) (3870, 44)
 # dataset.head()
 print(dataset.info())
-dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')
-dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna('None')
-dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna('None')
-dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna('None')
-dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna('None')
-dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna('None')
-dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('other')
+
+# Prediction with the test dataset
+test_path = 'Test.csv'
+dataset_test = pd.read_csv(test_path)
+dataset_upload = dataset_test.copy()
+
+dataset_test = dataset_test.drop(columns=['ID'], axis=1)
+# print(dataset_test.shape)
+# dataset_test.head()
+
+# print(set(dataset.columns) == set(dataset_test.columns))
+# print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
+# 'Yield' is the target variable, so it's not in the test dataset
+
+# Save the 'Yield' column
+train_labels = dataset['Yield'].copy()
+dataset = dataset.drop(columns=['ID','Yield'], axis=1)
+dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna(dataset['OrgFertilizers'].mode()[0])
+dataset['CropbasalFerts'] = dataset['CropbasalFerts'].fillna(dataset['CropbasalFerts'].mode()[0])
+dataset['FirstTopDressFert'] = dataset['FirstTopDressFert'].fillna(dataset['FirstTopDressFert'].mode()[0])
+dataset['NursDetFactor'] = dataset['NursDetFactor'].fillna(dataset['NursDetFactor'].mode()[0])
+dataset['LandPreparationMethod'] = dataset['LandPreparationMethod'].fillna(dataset['LandPreparationMethod'].mode()[0])
+dataset['TransDetFactor'] = dataset['TransDetFactor'].fillna(dataset['TransDetFactor'].mode()[0])
+dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna(dataset['PCropSolidOrgFertAppMethod'].mode()[0])
+
+dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna(dataset_test['OrgFertilizers'].mode()[0])
+dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna(dataset_test['CropbasalFerts'].mode()[0])
+dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna(dataset_test['FirstTopDressFert'].mode()[0])
+dataset_test['NursDetFactor'] = dataset_test['NursDetFactor'].fillna(dataset_test['NursDetFactor'].mode()[0])
+dataset_test['LandPreparationMethod'] = dataset_test['LandPreparationMethod'].fillna(dataset_test['LandPreparationMethod'].mode()[0])
+dataset_test['TransDetFactor'] = dataset_test['TransDetFactor'].fillna(dataset_test['TransDetFactor'].mode()[0])
+dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna(dataset_test['PCropSolidOrgFertAppMethod'].mode()[0])
 
 
 
-import numpy as np
 """
 # For each column you want to fill with a distribution of its own values
 for column in ['OrgFertilizers', 'CropbasalFerts', 'FirstTopDressFert', 
@@ -74,7 +98,7 @@ for column in categorical_columns:
 """
 # Checking the unique values for categorical variables to identify sparse classes
 categorical_columns = dataset.select_dtypes(include=['object']).columns
-sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 10}
+sparse_classes = {col: dataset[col].nunique() for col in categorical_columns if dataset[col].nunique() > 30}
 # Define a threshold for grouping
 # Here we choose 5% as our threshold, any category that doesn't make up at least 5% of the total will be grouped into 'other'
 threshold_percentage = 5
@@ -112,31 +136,6 @@ print(dataset['OrgFertilizers'].value_counts())
 
 #print(dataset.shape, dataset.columns)
 
-# Prediction with the test dataset
-test_path = 'Test.csv'
-dataset_test = pd.read_csv(test_path)
-dataset_upload = dataset_test.copy()
-print(dataset_upload['ID'].head())
-
-dataset_test = dataset_test.drop(columns=['ID'], axis=1)
-# print(dataset_test.shape)
-# dataset_test.head()
-
-dataset_test['OrgFertilizers'] = dataset_test['OrgFertilizers'].fillna('None')
-dataset_test['CropbasalFerts'] = dataset_test['CropbasalFerts'].fillna('None')
-dataset_test['FirstTopDressFert'] = dataset_test['FirstTopDressFert'].fillna('None')
-dataset_test['NursDetFactor'] = dataset_test['NursDetFactor'].fillna('None')
-dataset_test['LandPreparationMethod'] = dataset_test['LandPreparationMethod'].fillna('None')
-dataset_test['TransDetFactor'] = dataset_test['TransDetFactor'].fillna('None')
-dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('other')
-# print(set(dataset.columns) == set(dataset_test.columns))
-# print("Columns in dataset but not in dataset_test: ", set(dataset.columns) - set(dataset_test.columns))
-# 'Yield' is the target variable, so it's not in the test dataset
-
-# Save the 'Yield' column
-train_labels = dataset['Yield'].copy()
-dataset = dataset.drop(columns=['ID','Yield'], axis=1)
-
 # Copy the original dataset
 # dataset_original = dataset.copy()
 # dataset_test_original = dataset_test.copy()
@@ -161,8 +160,8 @@ for col in ['LandPreparationMethod', 'OrgFertilizers', 'CropbasalFerts', 'FirstT
     test_dataset = adjust_test_categories(dataset, dataset_test, col)
 
 # Check the new number of unique values for the grouped columns in the test dataset after the adjustment
-adjusted_unique_values_test = {col: dataset_test[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 
-                                                                           'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
+# adjusted_unique_values_test = {col: dataset_test[col].unique() for col in ['LandPreparationMethod', 'OrgFertilizers', 
+                                                                           #'CropbasalFerts', 'FirstTopDressFert', 'NursDetFactor', 'TransDetFactor']}
 
 # print(dataset.columns == dataset_test.columns)
 ###-----------###
@@ -177,16 +176,16 @@ moderate_skewed_features = ['BasalDAP', 'Acre',
 dataset[high_skewed_features] = dataset[high_skewed_features].fillna(dataset[high_skewed_features].median())
 dataset_test[high_skewed_features] = dataset_test[high_skewed_features].fillna(dataset_test[high_skewed_features].median())
 
-"""
+
 # Fill the low_skewed_features with median
-dataset[low_skewed_features] = dataset[low_skewed_features].fillna(dataset[low_skewed_features].median())
-dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(dataset_test[low_skewed_features].median())
+dataset[low_skewed_features] = dataset[low_skewed_features].fillna(0)
+dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(0)
 
 # Fill the moderate_skewed_features with median 
 dataset[moderate_skewed_features] = dataset[moderate_skewed_features].fillna(dataset[moderate_skewed_features].median())
-dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median())
-"""
+dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median()) 
 
+"""
 # Outlier remove preprocessing
 # Cap at 99th percentile
 for feature in moderate_skewed_features:
@@ -209,7 +208,7 @@ for feature in low_skewed_features:
     outlier_indices_test = dataset_test[feature].dropna().index[abs_z_scores_test > 3]
     dataset.loc[outlier_indices, feature] = median_value
     dataset_test.loc[outlier_indices_test, feature] = median_value_test
-
+"""
 # debug
 # print(set(dataset.columns) == set(dataset_test.columns))
 
@@ -380,6 +379,7 @@ dataset['CropOrgFYM'] = dataset['CropOrgFYM'].fillna(0)
 dataset_test['Ganaura'] = dataset_test['Ganaura'].fillna(0)
 dataset_test['CropOrgFYM'] = dataset_test['CropOrgFYM'].fillna(0)
 
+""""
 dataset['TotalOrganicFertilizer'] = dataset['Ganaura'] + dataset['CropOrgFYM']
 dataset['TotalChemicalFertilizer'] = dataset['BasalDAP'] + dataset['BasalUrea'] + dataset['1tdUrea'] + dataset['2tdUrea']
 dataset['TotalFertilizerUsed'] = dataset['TotalOrganicFertilizer'] + dataset['TotalChemicalFertilizer']
@@ -394,7 +394,7 @@ dataset_test['Organic_Chemical_Fertilizer_Ratio'] = dataset_test['TotalOrganicFe
 dataset_test['Organic_Total_Fertilizer_Ratio'] = dataset_test['TotalOrganicFertilizer'] / dataset_test['TotalFertilizerUsed']
 dataset['Organic_Chemical_Fertilizer_Ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace inf with NaN for division by zero cases, actually no in our case.
 dataset_test['Organic_Chemical_Fertilizer_Ratio'].replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace inf with NaN for division by zero cases, actually no in our case.
-
+"""
 """
 print(dataset['Organic_Chemical_Fertilizer_Ratio'].isnull().sum(), "NaNs in Organic_Chemical_Fertilizer_Ratio")
 print(dataset_test['Organic_Chemical_Fertilizer_Ratio'].isnull().sum(), "NaNs in Organic_Chemical_Fertilizer_Ratio")
@@ -409,17 +409,19 @@ dataset_test['CultLand_Squared'] = dataset_test['CultLand'] ** 2
 dataset_test['CropCultLand_Squared'] = dataset_test['CropCultLand'] ** 2
 """
 
+"""
 # Create new columns TotalUrea and TotalAppDaysUrea by summing 1tdUrea and 2tdUrea, and 1appDaysUrea and 2appDaysUrea
 dataset['TotalUrea'] = dataset['1tdUrea'] + dataset['2tdUrea'] + dataset['BasalUrea']
 dataset_test['TotalUrea'] = dataset_test['1tdUrea'] + dataset_test['2tdUrea'] + dataset_test['BasalUrea']
-
+"""
 
 # Do the same for 1appDaysUrea and 2appDaysUrea
-dataset['1appDaysUrea'] = dataset['1appDaysUrea'].fillna(0)
-dataset['2appDaysUrea'] = dataset['2appDaysUrea'].fillna(0)
-dataset_test['1appDaysUrea'] = dataset_test['1appDaysUrea'].fillna(0)
-dataset_test['2appDaysUrea'] = dataset_test['2appDaysUrea'].fillna(0)
+dataset['1appDaysUrea'] = dataset['1appDaysUrea'].fillna(dataset['1appDaysUrea'].median())
+dataset['2appDaysUrea'] = dataset['2appDaysUrea'].fillna(dataset['2appDaysUrea'].median())
+dataset_test['1appDaysUrea'] = dataset_test['1appDaysUrea'].fillna(dataset_test['1appDaysUrea'].median())
+dataset_test['2appDaysUrea'] = dataset_test['2appDaysUrea'].fillna(dataset_test['2appDaysUrea'].median())
 
+"""
 dataset['TotalAppDaysUrea'] = dataset['1appDaysUrea'] + dataset['2appDaysUrea']
 dataset_test['TotalAppDaysUrea'] = dataset_test['1appDaysUrea'] + dataset_test['2appDaysUrea']
 
@@ -430,6 +432,7 @@ dataset['Crop_FirstTop'] = dataset['CropbasalFerts'].astype(str) + "+" + dataset
 dataset_test['Crop_FirstTop'] = dataset_test['CropbasalFerts'].astype(str) + "+" + dataset_test['FirstTopDressFert'].astype(str)
 dataset['Org_FirstTop'] = dataset['OrgFertilizers'].astype(str) + "+" + dataset['FirstTopDressFert'].astype(str)
 dataset_test['Org_FirstTop'] = dataset_test['OrgFertilizers'].astype(str) + "+" + dataset_test['FirstTopDressFert'].astype(str)
+"""
 """
 dataset['PCropSolidOrgFertAppMethod'] = dataset['PCropSolidOrgFertAppMethod'].fillna('other')
 dataset_test['PCropSolidOrgFertAppMethod'] = dataset_test['PCropSolidOrgFertAppMethod'].fillna('other')
@@ -478,10 +481,16 @@ dataset_test['Harv_hand_rent'] = dataset_test['Harv_hand_rent'].fillna(0)
  'Harv_date_SeedingSowingTransplanting', 'Harv_date_RcNursEstDate', 'Harv_date_CropTillageDate', 'Threshing_date_Harv_date',
  'TotalChemicalFertilizer', 'TotalFertilizerUsed', 'Organic_Chemical_Fertilizer_Ratio', 'Organic_Total_Fertilizer_Ratio']"""
 # Drop the columns used to generate the new features, not the new features themselves
+"""
 dataset = dataset.drop(columns = ['BasalUrea', '1tdUrea', '2tdUrea', 'BasalDAP', 
                                   'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month'], axis=1)
 dataset_test = dataset_test.drop(columns = ['BasalUrea', '1tdUrea', '2tdUrea', 'BasalDAP',
                                             'Ganaura', 'CropOrgFYM',  '1appDaysUrea', '2appDaysUrea', 'Harv_date_Month'], axis=1)
+
+"""
+dataset = dataset.drop(columns=['Harv_date_Month'], axis=1)
+dataset_test = dataset_test.drop(columns=['Harv_date_Month'], axis=1)
+
 
 for col in dataset.columns:
     if dataset[col].dtype == 'object':
@@ -500,7 +509,8 @@ for col in dataset_test.columns:
 X = dataset
 
 y = train_labels    
-print(X.shape, y.shape)
+# print(X.shape, y.shape)
+
 # Train Test split
 # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=300)
 
@@ -590,9 +600,11 @@ import numpy as np
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
+print(dataset.columns, dataset_test.columns)
+
 # Parameters
 n_splits = 20
-kf = KFold(n_splits=n_splits, shuffle=True, random_state=78)
+kf = KFold(n_splits=n_splits, shuffle=True, random_state=1024)
 
 # Prepare an array to store the RMSE for each fold
 rmse_scores = []
@@ -608,13 +620,13 @@ for fold, (train_index, val_index) in enumerate(kf.split(X)):
     y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
 
     # Create a LGBMRegressor object
-    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.01, n_estimators=100)
+    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=15, learning_rate=0.05, n_estimators=38)
     
     # Train the model
     lgbm_model.fit(
         X_train_fold, y_train_fold,  
         eval_set=[(X_val_fold, y_val_fold)],
-        eval_metric='rmse', 
+        eval_metric='mae', 
         categorical_feature=whole_categorical_cols
     )
     
@@ -658,7 +670,7 @@ y_pred_test = np.mean(test_predictions, axis=1)
 # y_pred_test = lgbm_model.predict(test_df, num_iteration=lgbm_model.best_iteration_)
 
 submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
-submission_df.to_csv('10_mae.csv', index=False)
+submission_df.to_csv('10_mae_real.csv', index=False)
 
 sys.exit()
 
