@@ -37,6 +37,14 @@ dataset_test = pd.read_csv(test_path)
 dataset_upload = dataset_test.copy()
 dataset_test = dataset_test.drop(columns=['ID'], axis=1)
 
+# check the unique value of the "TransplantingIrrigationSource" column
+print(dataset['TransplantingIrrigationSource'].unique())
+
+print(dataset['TransplantingIrrigationPowerSource'].unique())
+
+print(dataset['CropEstMethod'].unique())
+dataset.info()
+sys.exit()
 # If no OrganicFertilizer, then fill the OrgFertilizers with None, and fill PCropSolidOrgFertAppMethod with None
 dataset['Harv_hand_rent'] = dataset['Harv_hand_rent'].fillna(0)
 dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')
@@ -123,13 +131,20 @@ moderate_skewed_features = ['BasalDAP', 'Acre',
                             'TransIrriCost', 'Ganaura',
                             'BasalUrea', 'TransplantingIrrigationHours']
 
+### The TransIrriCost should be connected with TransplantingIrrigationSource, if there is no method used, 
+### then it should be 0, otherwise maybe try to use the mean value to fill the missing value for each method
+
+
 dataset['StandingWater'] = dataset['StandingWater'].fillna(0)
+dataset_test['StandingWater'] = dataset_test['StandingWater'].fillna(0)
+
+dataset['Ganaura'] = dataset['Ganaura'].fillna(0)
+dataset_test['Ganaura'] = dataset_test['Ganaura'].fillna(0)
 # Fill the low_skewed_features with median
 dataset[low_skewed_features] = dataset[low_skewed_features].fillna(0)
 dataset_test[low_skewed_features] = dataset_test[low_skewed_features].fillna(0)
 
 print(dataset.info())
-sys.exit()
 # Fill the moderate_skewed_features with median 
 dataset[moderate_skewed_features] = dataset[moderate_skewed_features].fillna(dataset[moderate_skewed_features].median())
 dataset_test[moderate_skewed_features] = dataset_test[moderate_skewed_features].fillna(dataset_test[moderate_skewed_features].median()) 
