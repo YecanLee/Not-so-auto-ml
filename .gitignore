@@ -1,0 +1,6 @@
+# Ignore all the CSV file here
+
+results_folder/
+
+# Ignore unclearly notebook
+feature_beta.ipynb
