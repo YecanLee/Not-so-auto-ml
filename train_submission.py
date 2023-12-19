@@ -1,50 +1,435 @@
 import pandas as pd
 import numpy as np
+
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-
 from sklearn.ensemble import VotingRegressor
 from sklearn.model_selection import cross_val_score
-import numpy as np
-import pandas as pd
-import lightgbm as lgb
-import sys
-import sys
-
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-import lightgbm as lgb
+from sklearn.feature_selection import chi2
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.model_selection import KFold
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from scipy.stats import zscore
+import lightgbm as lgb
+from catboost import CatBoostRegressor
 
-import pandas as pd
-from sklearn.feature_selection import chi2
-from sklearn.preprocessing import LabelEncoder
-# from catboost import CatBoostRegressor
-
-# Variance Threshold:
-# from sklearn.feature_selection import VarianceThreshold
-
-# Read the dataset
+import sys
+# Load the train dataset
 path = 'Train.csv'
 dataset = pd.read_csv(path)
 train_labels = dataset['Yield'].copy()
 dataset = dataset.drop(columns=['ID','Yield'], axis=1)
+dataset_copy = dataset.copy()
 
+# Load the test dataset
 test_path = 'Test.csv'
 dataset_test = pd.read_csv(test_path)
-dataset_upload = dataset_test.copy()
-dataset_test = dataset_test.drop(columns=['ID'], axis=1)
+test_labels = dataset_test['Yield'].copy()
+dataset_test = dataset_test.drop(columns=['ID', 'Yield'], axis=1)
+dataset_test_copy = dataset_test.copy()
+
+# debug
+# print(dataset_test_copy.head())
+
+# The first step would be checking the missing data inside the datasets
+# print(dataset.info())
+# print(dataset_test.info())
+# There are many missing data distributed in different data columns, thus we need to fill the missing data by trying different method
+
+# sys.exit()
+# We first try with vanilla method, we fill the missing value in all the numerical columns with median value
+
+# Identify numerical and categorical columns, remember that object data includes object and category two dtypes
+numerical_cols = dataset.select_dtypes(include=['number']).columns
+categorical_cols = dataset.select_dtypes(include=['object', 'category']).columns
+
+# Fill missing values for numerical columns with median, then run a basic experiment, to show that there is no bug inside this right now
+for col in numerical_cols:
+    median_value = dataset_copy[col].median()
+    dataset_copy[col] = dataset_copy[col].fillna(median_value)
+    if col in dataset_test_copy.columns:
+        median_value_test = dataset_test_copy[col].median()
+        dataset_test_copy[col] = dataset_test_copy[col].fillna(median_value_test)  # Apply the same median value to the test set
+
+# Fill missing values for categorical columns with mode
+# Fill missing values for categorical columns with the mode
+for col in categorical_cols:
+    mode_value = dataset_copy[col].mode()[0]
+    dataset_copy[col] = dataset_copy[col].fillna(mode_value)
+    if col in dataset_test_copy.columns:
+        mode_value_test = dataset_test_copy[col].mode()[0]
+        dataset_test_copy[col] = dataset_test_copy[col].fillna(mode_value_test)  # Apply the same mode value to the test set
+
+        
+X = dataset_copy
+y = train_labels 
+
+# Transfer the object datatype into 
+for col in dataset_copy.columns:
+    if dataset_copy[col].dtype == 'object':
+        dataset_copy[col] = dataset_copy[col].astype('category').cat.codes
+    elif dataset_copy[col].dtype == 'datetime64[ns]':
+        dataset_copy = dataset_copy.drop(columns=[col])
+
+for col in dataset_test_copy.columns:
+    if dataset_test_copy[col].dtype == 'object':
+        dataset_test_copy[col] = dataset_test_copy[col].astype('category').cat.codes
+    elif dataset_test_copy[col].dtype == 'datetime64[ns]':
+        dataset_test_copy = dataset_test_copy.drop(columns=[col])
+
+categorical_cols = list(categorical_cols)
+# print(categorical_cols)
+
+# Parameters
+n_splits = 5
+kf = KFold(n_splits=n_splits, shuffle=True, random_state=1024)
+
+# Prepare an array to store the RMSE for each fold
+rmse_scores = []
+models = []
+
+# Initialize an empty array to hold feature importances
+feature_importances = np.zeros(X.shape[1])
+
+# Start the K-Fold cross-validation loop
+for fold, (train_index, val_index) in enumerate(kf.split(X)):
+    # Split the data
+    X_train_fold, X_val_fold = X.iloc[train_index], X.iloc[val_index]
+    y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
+
+    # Create a LGBMRegressor object
+    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.1, n_estimators=42)
+    
+    # Train the model
+    lgbm_model.fit(
+        X_train_fold, y_train_fold,  
+        eval_set=[(X_val_fold, y_val_fold)],
+        eval_metric='mse', 
+        categorical_feature=categorical_cols
+    )
+    
+    # Predict on the validation set
+    y_pred_val = lgbm_model.predict(X_val_fold, num_iteration=lgbm_model.best_iteration_)
+
+    # Calculate and print RMSE for the current fold
+    fold_rmse = np.sqrt(mean_squared_error(y_val_fold, y_pred_val))
+    rmse_scores.append(fold_rmse)
+    print(f"Fold {fold}: RMSE: {fold_rmse}")
+
+    # Accumulate feature importances
+    feature_importances += lgbm_model.feature_importances_
+
+    models.append(lgbm_model)
+
+# After cross-validation, print the mean RMSE
+print(f"Mean RMSE: {np.mean(rmse_scores)}")
+
+# Feature importances from all folds
+feature_importances = feature_importances / n_splits
+
+test_predictions = []
+
+for model in models:
+    # Make predictions
+    test_df = dataset_test_copy[X.columns]
+    # print(test_df.shape)
+    fold_preds = model.predict(test_df, num_iteration=model.best_iteration_)
+    test_predictions.append(fold_preds)
+
+# Now average these predictions
+test_predictions = np.column_stack(test_predictions)
+y_pred_test = np.mean(test_predictions, axis=1)
+test_rmse = np.sqrt(mean_squared_error(test_labels, y_pred_test))
+print(f"MSE of the prediction is {test_rmse}")
+# Now you have `y_pred_test` which is the averaged predictions from all folds
+
+# Create a submission file
+# Make predictions on the Zindi test set
+# test_df = dataset_test[X.columns]
+# y_pred_test = lgbm_model.predict(test_df, num_iteration=lgbm_model.best_iteration_)
+
+###--- Great! We got our first result already! But can we improve this result? ---###
+
+# Should we deal with different missing values with different method? 
+# The idea for dealing with different missing values would be checking the description of those variables first
+# We will first check the variable groups with variables related to Irrigation, a.k.a watering conditions.
 
 # check the unique value of the "TransplantingIrrigationSource" column
-print(dataset['TransplantingIrrigationSource'].unique())
+# fig, ax = plt.subplots(1, 4, figsize=(14, 14))
 
-print(dataset['TransplantingIrrigationPowerSource'].unique())
+# Function to transform column into 'Missing'/'Non-Missing'
+def missing_status(column):
+    return column.isna().map({True: 'Missing', False: 'Non-Missing'})
 
-print(dataset['CropEstMethod'].unique())
-dataset.info()
+# Plot setup
+plt.figure(figsize=(12, 6))  # Adjust the figure size as needed
+
+# TransplantingIrrigationHours
+plt.subplot(1, 3, 1)  # Adjust for 3 subplots
+sns.countplot(y=missing_status(dataset['TransplantingIrrigationHours']))
+plt.title('TransplantingIrrigationHours Missing Status')
+
+# TransplantingIrrigationSource
+plt.subplot(1, 3, 2)
+sns.countplot(y=missing_status(dataset['TransplantingIrrigationSource']))
+plt.title('TransplantingIrrigationSource Missing Status')
+
+# TransplantingIrrigationPowerSource
+plt.subplot(1, 3, 3)
+sns.countplot(y=missing_status(dataset['TransplantingIrrigationPowerSource']))
+plt.title('TransplantingIrrigationPowerSource Missing Status')
+
+# Adjustments
+plt.tight_layout()
+plt.show()
+
+# Separate plot for TransIrriCost
+plt.figure(figsize=(6, 4))  # Adjust the figure size as needed
+sns.countplot(y=missing_status(dataset['TransIrriCost']))
+plt.title('TransIrriCost Missing Status')
+
+# Adjustments
+plt.tight_layout()
+plt.show()
+
+plt.subplot(1, 2, 1)
+sns.countplot(data = dataset, y = dataset['TransplantingIrrigationHours'].fillna('nan'))
+plt.title('Distribution of TransplantingIrrigationHours')
+
+plt.subplot(1, 2, 2)
+sns.countplot(data = dataset, y = dataset['TransplantingIrrigationSource'].fillna('nan'))
+plt.title('Distribution of TransplantingIrrigationSource')
+
+plt.xticks(rotation=45)
+plt.yticks(rotation=45)
+
+plt.tight_layout()
+plt.show()
+
+plt.subplot(1, 1, 1)
+sns.countplot(data = dataset, y = dataset['TransplantingIrrigationPowerSource'].fillna('nan'))
+plt.title('Distribution of TransplantingIrrigationPowerSource')
+
+plt.tight_layout()
+plt.show()
+
+plt.subplot(1, 1, 1)
+sns.countplot(data = dataset.fillna(False), y = dataset['TransIrriCost'].fillna('NaN'))
+plt.title('Distribution of TransIrriCost')
+
+plt.xticks(size=5)
+plt.yticks(size=5)
+
+plt.show()
+
+# Filtering the dataset to include rows where 'TransplantingIrrigationHours' is not zero
+
+df_non_zero_irrigation = dataset[dataset['TransplantingIrrigationHours'] != 0]
+df_test_non_zero_irrigation = dataset_test[dataset_test['TransplantingIrrigationHours'] != 0]
+
+# Checking how many unique combinations exist for 'TransplantingIrrigationSource' and 'TransplantingIrrigationPowerSource'
+unique_combinations = df_non_zero_irrigation.groupby(['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource']).size().reset_index(name='Count')
+unique_combinations_test = df_test_non_zero_irrigation.groupby(['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource']).size().reset_index(name='Count')
+unique_combinations_count = unique_combinations.shape[0]
+unique_combinations_count_test = unique_combinations_test.shape[0]
+
+# Calculating the average 'TransIrriCost' for each group
+avg_cost_by_group = df_non_zero_irrigation.groupby(['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'])['TransIrriCost'].mean().reset_index()
+avg_cost_by_group_test = df_test_non_zero_irrigation.groupby(['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'])['TransIrriCost'].mean().reset_index()
+
+# Merging the average cost back to the original dataframe to fill missing values
+# We will perform a left join on the original dataframe with the average cost dataframe based on the two groupby columns
+dataset = dataset.merge(avg_cost_by_group, how='left', on=['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'], suffixes=('', '_avg'))
+dataset_test = dataset_test.merge(avg_cost_by_group_test, how='left', on=['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'], suffixes=('', '_avg'))
+
+# Now we fill the missing 'TransIrriCost' values where 'TransplantingIrrigationHours' is not zero
+# with the corresponding average cost from the same group
+mask = (dataset['TransplantingIrrigationHours'] != 0) & (dataset['TransIrriCost'].isnull())
+dataset.loc[mask, 'TransIrriCost'] = dataset.loc[mask, 'TransIrriCost_avg']
+mask_test = (dataset_test['TransplantingIrrigationHours'] != 0) & (dataset_test['TransIrriCost'].isnull())
+dataset_test.loc[mask_test, 'TransIrriCost'] = dataset_test.loc[mask_test, 'TransIrriCost_avg']
+
+dataset.drop('TransIrriCost_avg', axis=1, inplace=True)
+dataset_test.drop('TransIrriCost_avg', axis=1, inplace=True)
+
+# Filling in 'TransIrriCost' with 0 where 'TransplantingIrrigationHours' is 0
+dataset.loc[dataset['TransplantingIrrigationHours'] == 0, 'TransIrriCost'] = 0
+dataset_test.loc[dataset_test['TransplantingIrrigationHours'] == 0, 'TransIrriCost'] = 0
+
+# Find the mode of 'TransplantingIrrigationSource' for each 'CropEstMethod'
+irrigation_source_mode = dataset.groupby('CropEstMethod')['TransplantingIrrigationSource'].agg(pd.Series.mode).reset_index()
+irrigation_test_source_mode = dataset_test.groupby('CropEstMethod')['TransplantingIrrigationSource'].agg(pd.Series.mode).reset_index()
+
+# There can be more than one mode in a set of values, so we ensure to have a single value by picking the first one
+irrigation_source_mode['TransplantingIrrigationSource'] = irrigation_source_mode['TransplantingIrrigationSource'].apply(lambda x: x[0] if isinstance(x, (list, tuple)) else x)
+irrigation_test_source_mode['TransplantingIrrigationSource'] = irrigation_test_source_mode['TransplantingIrrigationSource'].apply(lambda x: x[0] if isinstance(x, (list, tuple)) else x)
+
+# Create a dictionary for mapping 'CropEstMethod' to the mode of 'TransplantingIrrigationSource'
+irrigation_source_map = dict(zip(irrigation_source_mode['CropEstMethod'], irrigation_source_mode['TransplantingIrrigationSource']))
+irrigation_test_source_map = dict(zip(irrigation_test_source_mode['CropEstMethod'], irrigation_test_source_mode['TransplantingIrrigationSource']))
+
+# Fill missing 'TransplantingIrrigationSource' values based on the 'CropEstMethod' they correspond to
+dataset['TransplantingIrrigationSource'] = dataset.apply(
+    lambda row: irrigation_source_map[row['CropEstMethod']] if pd.isnull(row['TransplantingIrrigationSource']) else row['TransplantingIrrigationSource'],
+    axis=1
+)
+dataset_test['TransplantingIrrigationSource'] = dataset_test.apply(
+    lambda row: irrigation_test_source_map[row['CropEstMethod']] if pd.isnull(row['TransplantingIrrigationSource']) else row['TransplantingIrrigationSource'],
+    axis=1
+)
+
+# Next, we fill in the missing values for 'TransplantingIrrigationPowerSource' in a similar fashion
+power_source_mode = dataset.groupby('CropEstMethod')['TransplantingIrrigationPowerSource'].agg(pd.Series.mode).reset_index()
+power_source_test_mode = dataset_test.groupby('CropEstMethod')['TransplantingIrrigationPowerSource'].agg(pd.Series.mode).reset_index()
+power_source_mode['TransplantingIrrigationPowerSource'] = power_source_mode['TransplantingIrrigationPowerSource'].apply(lambda x: x[0] if isinstance(x, (list, tuple)) else x)
+power_source_map = dict(zip(power_source_mode['CropEstMethod'], power_source_mode['TransplantingIrrigationPowerSource']))
+dataset['TransplantingIrrigationPowerSource'] = dataset.apply(
+    lambda row: power_source_map[row['CropEstMethod']] if pd.isnull(row['TransplantingIrrigationPowerSource']) else row['TransplantingIrrigationPowerSource'],
+    axis=1
+)
+power_source_test_mode['TransplantingIrrigationPowerSource'] = power_source_test_mode['TransplantingIrrigationPowerSource'].apply(lambda x: x[0] if isinstance(x, (list, tuple)) else x)
+power_source_test_map = dict(zip(power_source_test_mode['CropEstMethod'], power_source_test_mode['TransplantingIrrigationPowerSource']))
+dataset_test['TransplantingIrrigationPowerSource'] = dataset_test.apply(
+    lambda row: power_source_test_map[row['CropEstMethod']] if pd.isnull(row['TransplantingIrrigationPowerSource']) else row['TransplantingIrrigationPowerSource'],
+    axis=1
+)
+
+# Now, we recalculate the average 'TransIrriCost' for each group of 'TransplantingIrrigationSource' and 'TransplantingIrrigationPowerSource'
+avg_cost_by_group = dataset.groupby(['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'])['TransIrriCost'].mean().reset_index()
+dataset = dataset.merge(avg_cost_by_group, how='left', on=['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'], suffixes=('', '_avg'))
+avr_cost_by_group_test = dataset_test.groupby(['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'])['TransIrriCost'].mean().reset_index()
+dataset_test = dataset_test.merge(avr_cost_by_group_test, how='left', on=['TransplantingIrrigationSource', 'TransplantingIrrigationPowerSource'], suffixes=('', '_avg'))
+
+# Fill the missing 'TransIrriCost' values again
+mask = (dataset['TransplantingIrrigationHours'] != 0) & (dataset['TransIrriCost'].isnull())
+dataset.loc[mask, 'TransIrriCost'] = dataset.loc[mask, 'TransIrriCost_avg']
+dataset.drop('TransIrriCost_avg', axis=1, inplace=True)
+mask_test = (dataset_test['TransplantingIrrigationHours'] != 0) & (dataset_test['TransIrriCost'].isnull())
+dataset_test.loc[mask_test, 'TransIrriCost'] = dataset_test.loc[mask_test, 'TransIrriCost_avg']
+dataset_test.drop('TransIrriCost_avg', axis=1, inplace=True)
+
+# Visualize the result after we do the preprocessing 
+# Plot setup
+plt.figure(figsize=(12, 6))  # Adjust the figure size as needed
+
+# TransplantingIrrigationHours
+plt.subplot(1, 3, 1)  # Adjust for 3 subplots
+sns.countplot(y=missing_status(dataset['TransplantingIrrigationHours']))
+plt.title('TransplantingIrrigationHours Missing Status')
+
+# TransplantingIrrigationSource
+plt.subplot(1, 3, 2)
+sns.countplot(y=missing_status(dataset['TransplantingIrrigationSource']))
+plt.title('TransplantingIrrigationSource Missing Status')
+
+# TransplantingIrrigationPowerSource
+plt.subplot(1, 3, 3)
+sns.countplot(y=missing_status(dataset['TransplantingIrrigationPowerSource']))
+plt.title('TransplantingIrrigationPowerSource Missing Status')
+
+# Adjustments
+plt.tight_layout()
+plt.show()
+
+# Separate plot for TransIrriCost
+plt.figure(figsize=(6, 4))  # Adjust the figure size as needed
+sns.countplot(y=missing_status(dataset['TransIrriCost']))
+plt.title('TransIrriCost Missing Status')
+
+# Adjustments
+plt.tight_layout()
+plt.show()
+
+# Calculate if our result improved or not 
+X = dataset
+y = train_labels 
+
+# Transfer the object datatype into category data
+for col in dataset.columns:
+    if dataset[col].dtype == 'object':
+        dataset[col] = dataset[col].astype('category').cat.codes
+    elif dataset[col].dtype == 'datetime64[ns]':
+        dataset = dataset.drop(columns=[col])
+
+for col in dataset_test_copy.columns:
+    if dataset_test[col].dtype == 'object':
+        dataset_test[col] = dataset_test[col].astype('category').cat.codes
+    elif dataset_test[col].dtype == 'datetime64[ns]':
+        dataset_test = dataset_test.drop(columns=[col])
+
+categorical_cols = list(categorical_cols)
+# print(categorical_cols)
+
+# Parameters
+n_splits = 5
+kf = KFold(n_splits=n_splits, shuffle=True, random_state=1024)
+
+# Prepare an array to store the RMSE for each fold
+rmse_scores = []
+models = []
+
+# Initialize an empty array to hold feature importances
+feature_importances = np.zeros(X.shape[1])
+
+# Start the K-Fold cross-validation loop
+for fold, (train_index, val_index) in enumerate(kf.split(X)):
+    # Split the data
+    X_train_fold, X_val_fold = X.iloc[train_index], X.iloc[val_index]
+    y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
+
+    # Create a LGBMRegressor object
+    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.1, n_estimators=42)
+    
+    # Train the model
+    lgbm_model.fit(
+        X_train_fold, y_train_fold,  
+        eval_set=[(X_val_fold, y_val_fold)],
+        eval_metric='mse', 
+        categorical_feature=categorical_cols
+    )
+    
+    # Predict on the validation set
+    y_pred_val = lgbm_model.predict(X_val_fold, num_iteration=lgbm_model.best_iteration_)
+
+    # Calculate and print RMSE for the current fold
+    fold_rmse = np.sqrt(mean_squared_error(y_val_fold, y_pred_val))
+    rmse_scores.append(fold_rmse)
+    print(f"Fold {fold}: RMSE: {fold_rmse}")
+
+    # Accumulate feature importances
+    feature_importances += lgbm_model.feature_importances_
+
+    models.append(lgbm_model)
+
+# After cross-validation, print the mean RMSE
+print(f"Mean RMSE: {np.mean(rmse_scores)}")
+
+test_predictions = []
+
+for model in models:
+    # Make predictions
+    test_df = dataset_test[X.columns]
+    # print(test_df.shape)
+    fold_preds = model.predict(test_df, num_iteration=model.best_iteration_)
+    test_predictions.append(fold_preds)
+
+
+test_predictions = np.column_stack(test_predictions)
+y_pred_test = np.mean(test_predictions, axis=1)
+test_rmse = np.sqrt(mean_squared_error(test_labels, y_pred_test))
+print(f"MSE of the prediction is {test_rmse}")
+
 sys.exit()
+# check if the column 'TransIrriCost' has any missing value
+# print(dataset['TransIrriCost'].isnull().sum())
+# print(dataset_test['TransIrriCost'].isnull().sum())
+
 # If no OrganicFertilizer, then fill the OrgFertilizers with None, and fill PCropSolidOrgFertAppMethod with None
 dataset['Harv_hand_rent'] = dataset['Harv_hand_rent'].fillna(0)
 dataset['OrgFertilizers'] = dataset['OrgFertilizers'].fillna('None')
@@ -566,7 +951,7 @@ from sklearn.model_selection import KFold
 print(dataset.columns, dataset_test.columns)
 
 # Parameters
-n_splits = 20
+n_splits = 5
 kf = KFold(n_splits=n_splits, shuffle=True, random_state=1024)
 
 # Prepare an array to store the RMSE for each fold
@@ -583,7 +968,7 @@ for fold, (train_index, val_index) in enumerate(kf.split(X)):
     y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
 
     # Create a LGBMRegressor object
-    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=15, learning_rate=0.05, n_estimators=38)
+    lgbm_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, learning_rate=0.1, n_estimators=42)
     
     # Train the model
     lgbm_model.fit(
@@ -633,7 +1018,7 @@ y_pred_test = np.mean(test_predictions, axis=1)
 # y_pred_test = lgbm_model.predict(test_df, num_iteration=lgbm_model.best_iteration_)
 
 submission_df = pd.DataFrame({'ID': dataset_upload['ID'], 'Yield': y_pred_test})
-submission_df.to_csv('10_mae_real.csv', index=False)
+submission_df.to_csv('11_10_1.csv', index=False)
 
 sys.exit()
 
